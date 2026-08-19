@@ -55,15 +55,16 @@ def enviar_email_banker(
     email_cfg: dict,
     grupo: GrupoBanker,
     subject: str,
-    imagem_png: bytes,
+    imagem_png: bytes | None,
     imagem_cid: str,
     html_body_factory,
 ) -> None:
-    """Envia (ou simula, em modo teste) o e-mail de saldo de um banker.
+    """Envia (ou simula, em modo teste) o e-mail de um banker.
 
     `html_body_factory(aviso_teste)` monta o corpo (referenciando a
     tabela como `cid:<imagem_cid>`) — recebe o aviso a exibir no topo
-    quando em modo teste, ou None em envio real.
+    quando em modo teste, ou None em envio real. `imagem_png=None`
+    quando não há tabela pra anexar (ex: nenhum vencimento no mês).
     """
     modo_teste = (email_cfg.get("modo_teste") or {}).get("ativo", False)
 
