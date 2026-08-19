@@ -2,9 +2,20 @@
 # settings.yaml NÃO é versionado (está no .gitignore) porque contém
 # credenciais de e-mail e caminhos de arquivos locais.
 
-# Caminho do arquivo com o saldo em conta de todos os clientes (gerado/exportado
-# pelo custodiante, backoffice, etc). Veja config/saldos.example.csv pro formato.
-saldos_csv: "config/saldos.csv"
+# Caminho do Excel de saldo em conta baixado do BTG (o mesmo arquivo que
+# hoje você baixa manualmente do portal). Veja config/saldos.example.xlsx
+# pro formato esperado.
+saldos_xlsx: "C:/Saldo/Saldo_em_CC_BTG.xlsx"
+
+# Aba do Excel que tem o saldo em conta corrente (não o patrimônio total).
+saldos_sheet: "Saldo Diário"
+
+# O BTG não exporta qual banker atende cada cliente — hoje todos os
+# clientes do arquivo são deste banker_id (precisa existir em
+# bankers.csv). Quando houver mais de um banker, troque isso por um
+# mapeamento código de cliente -> banker_id (veja o README, seção
+# "Múltiplos bankers").
+banker_padrao: "seu_banker_id"
 
 # Caminho do arquivo com o mapeamento banker -> e-mail. Veja
 # config/bankers.example.csv pro formato.

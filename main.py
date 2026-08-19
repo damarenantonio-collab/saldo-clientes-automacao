@@ -40,14 +40,15 @@ def load_settings(config_path: Path) -> dict:
 
 
 def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
-    saldos_csv = (ROOT / settings["saldos_csv"]).resolve()
+    saldos_xlsx = (ROOT / settings["saldos_xlsx"]).resolve()
     bankers_csv = (ROOT / settings["bankers_csv"]).resolve()
+    banker_padrao = settings["banker_padrao"]
+    sheet_name = settings.get("saldos_sheet", saldos.SHEET_PADRAO)
 
-    if not saldos_csv.exists():
+    if not saldos_xlsx.exists():
         raise RuntimeError(
-            f"{saldos_csv} não encontrado. Copie config/saldos.example.csv para "
-            f"config/saldos.csv (ou aponte saldos_csv em settings.yaml para o "
-            f"arquivo exportado do seu custodiante/backoffice)."
+            f"{saldos_xlsx} não encontrado. Aponte saldos_xlsx em settings.yaml para "
+            f"o Excel de saldo em conta baixado do BTG."
         )
     if not bankers_csv.exists():
         raise RuntimeError(
@@ -55,14 +56,14 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
             f"config/bankers.csv e preencha com seus bankers."
         )
 
-    df_saldos = saldos.load_saldos(saldos_csv)
+    df_saldos = saldos.load_saldos(saldos_xlsx, banker_padrao, sheet_name=sheet_name)
     mapa_bankers = bankers.load_bankers(bankers_csv)
     log_sensivel = settings.get("log_dados_sensiveis", False)
 
     logger.info(
-        "Carregado(s) %d cliente(s) de %d banker(s) distintos em saldos.csv.",
+        "Carregado(s) %d conta(s) de cliente da aba '%s'.",
         len(df_saldos),
-        df_saldos["banker_id"].nunique(),
+        sheet_name,
     )
 
     grupos, pendentes = agrupador.agrupar_por_banker(df_saldos, mapa_bankers)

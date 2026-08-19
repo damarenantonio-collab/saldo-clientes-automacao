@@ -1,41 +1,73 @@
-"""Leitura e validação do arquivo de saldo em conta dos clientes."""
+"""Leitura e validação do saldo em conta dos clientes, a partir da
+planilha exportada do BTG (aba "Saldo Diário").
 
+O BTG identifica cada cliente por um código (ex: "AOAK_MA"), não por
+nome, e não exporta o banker responsável — essa informação não existe
+nesse arquivo. Por isso, hoje, `banker_padrao` (de settings.yaml) é
+atribuído a todo mundo. Quando existir mais de um banker, troque isso
+por uma consulta a um mapeamento código -> banker_id (veja o README,
+seção "Múltiplos bankers").
+"""
+
+import unicodedata
 from pathlib import Path
 
 import pandas as pd
 
-REQUIRED_COLUMNS = {"banker_id", "cliente", "conta", "saldo"}
+SHEET_PADRAO = "Saldo Diário"
+
+# aceita pequenas variações de nome de coluna entre exportações do BTG
+# (a própria planilha já varia entre abas: "Conta BTG" vs "Conta do BTG")
+ALIASES_COLUNA = {
+    "conta btg": "conta",
+    "conta do btg": "conta",
+    "codigo do cliente": "cliente",
+    "saldo": "saldo",
+}
 
 
-def load_saldos(saldos_csv: Path) -> pd.DataFrame:
-    """Lê o CSV de saldos e valida as colunas obrigatórias.
+def _normalizar(texto: str) -> str:
+    sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
+    return sem_acento.strip().lower()
 
-    Uma linha por cliente. `banker_id` identifica o banker responsável por
-    aquele cliente e é a chave usada depois para decidir pra quem cada
-    linha pode ser enviada — nunca inclua nessa planilha um cliente sem
-    `banker_id` correto, ou ele não aparecerá em nenhum e-mail.
+
+def load_saldos(saldos_xlsx: Path, banker_padrao: str, sheet_name: str = SHEET_PADRAO) -> pd.DataFrame:
+    """Lê a aba de saldo em conta do Excel do BTG e retorna um DataFrame
+    com as colunas internas `banker_id`, `cliente`, `conta`, `saldo`.
+
+    Uma linha por conta BTG (um mesmo código de cliente pode ter mais de
+    uma conta). `banker_id` vem de `banker_padrao` — todo cliente do
+    arquivo é tratado como sendo desse banker.
     """
-    df = pd.read_csv(saldos_csv, dtype={"banker_id": str, "cliente": str, "conta": str})
+    bruto = pd.read_excel(saldos_xlsx, sheet_name=sheet_name, dtype=str)
 
-    missing = REQUIRED_COLUMNS - set(df.columns)
-    if missing:
-        raise RuntimeError(f"{saldos_csv} está faltando coluna(s): {sorted(missing)}")
+    renomear = {}
+    for coluna in bruto.columns:
+        chave = ALIASES_COLUNA.get(_normalizar(str(coluna)))
+        if chave:
+            renomear[coluna] = chave
 
-    df["banker_id"] = df["banker_id"].str.strip()
-    df["saldo"] = pd.to_numeric(df["saldo"], errors="coerce")
+    df = bruto.rename(columns=renomear)
 
-    sem_banker = df["banker_id"].isna() | (df["banker_id"] == "")
-    if sem_banker.any():
+    faltando = {"conta", "cliente", "saldo"} - set(df.columns)
+    if faltando:
         raise RuntimeError(
-            f"{sem_banker.sum()} linha(s) de {saldos_csv} sem banker_id preenchido. "
-            f"Corrija o arquivo antes de enviar — uma linha sem banker_id não tem "
-            f"como ser roteada com segurança para o e-mail certo."
+            f"{saldos_xlsx} (aba '{sheet_name}') está com coluna(s) não reconhecida(s): "
+            f"faltam {sorted(faltando)}. Colunas encontradas: {list(bruto.columns)}"
         )
+
+    df = df[["conta", "cliente", "saldo"]].copy()
+    df["cliente"] = df["cliente"].str.strip()
+    df["conta"] = df["conta"].str.strip()
+    df["saldo"] = pd.to_numeric(df["saldo"], errors="coerce")
+    df["banker_id"] = banker_padrao
+
+    sem_cliente = df["cliente"].isna() | (df["cliente"] == "")
+    if sem_cliente.any():
+        raise RuntimeError(f"{sem_cliente.sum()} linha(s) sem código de cliente preenchido.")
 
     saldo_invalido = df["saldo"].isna()
     if saldo_invalido.any():
-        raise RuntimeError(
-            f"{saldo_invalido.sum()} linha(s) de {saldos_csv} com saldo inválido (não numérico)."
-        )
+        raise RuntimeError(f"{saldo_invalido.sum()} linha(s) com saldo inválido (não numérico).")
 
     return df

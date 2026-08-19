@@ -31,13 +31,12 @@ echo ==========================================================
 echo Instalacao concluida!
 echo.
 echo Proximos passos: edite os arquivos dentro da pasta "config":
-echo   1. copie config\saldos.example.csv para config\saldos.csv
-echo      (ou aponte saldos_csv em settings.yaml pro arquivo real
-echo      exportado do custodiante/backoffice)
-echo   2. copie config\bankers.example.csv para config\bankers.csv
-echo      e preencha com os bankers reais (banker_id, nome, e-mail)
-echo   3. copie config\settings.example.yaml para config\settings.yaml
-echo      e ajuste os dados de SMTP (comece com modo_teste.ativo: true)
+echo   1. copie config\bankers.example.csv para config\bankers.csv
+echo      e preencha com o(s) banker(s) reais (banker_id, nome, e-mail)
+echo   2. copie config\settings.example.yaml para config\settings.yaml
+echo      e ajuste saldos_xlsx (caminho do Excel baixado do BTG),
+echo      banker_padrao e os dados de SMTP (comece com
+echo      modo_teste.ativo: true)
 echo.
 echo Depois disso, de duplo clique em atualizar.bat
 echo ==========================================================

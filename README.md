@@ -1,21 +1,56 @@
 # Saldo Clientes — Automação
 
-Envia, todo dia, um e-mail para cada banker do family office com o saldo
-em conta **apenas** dos seus próprios clientes. Nenhum banker recebe ou
-vê dados de clientes de outro banker.
+Envia por e-mail o saldo em conta corrente dos clientes, a partir do
+Excel que o BTG disponibiliza (`Saldo_em_CC_BTG.xlsx`, aba "Saldo
+Diário"). Hoje há um único banker e todos os clientes são dele; a
+estrutura já está pronta para, no futuro, separar por banker sem
+reescrever nada (veja "Múltiplos bankers" abaixo).
 
 ## Como funciona (resumo)
 
-1. Você mantém um arquivo `config/saldos.csv` com uma linha por cliente:
-   qual banker é responsável (`banker_id`), nome do cliente, conta e
-   saldo. Normalmente esse arquivo é exportado do seu custodiante/
-   backoffice todo dia.
-2. Você mantém um arquivo `config/bankers.csv` com o e-mail de cada
-   banker.
-3. Ao rodar `python main.py`, o script:
-   - agrupa as linhas de `saldos.csv` por `banker_id`;
-   - para cada banker, monta um e-mail HTML só com as linhas dele;
-   - envia esse e-mail só para o endereço daquele banker.
+1. Você baixa o Excel do BTG (manualmente, por enquanto) e salva sempre
+   no mesmo caminho — ex: `C:/Saldo/Saldo_em_CC_BTG.xlsx`.
+2. `settings.yaml` aponta pra esse caminho (`saldos_xlsx`) e diz qual é
+   o `banker_id` responsável por todo o arquivo (`banker_padrao`).
+3. `config/bankers.csv` tem o e-mail de cada banker (hoje, uma linha só).
+4. Ao rodar `python main.py`, o script lê a aba "Saldo Diário", monta um
+   e-mail HTML com todas as contas do arquivo, e envia pro e-mail do
+   banker correspondente.
+
+## Formato do Excel do BTG
+
+O script lê a aba **"Saldo Diário"**, que tem estas colunas (o nome
+exato pode variar um pouco entre exportações — o script tolera isso):
+
+| coluna              | descrição                                  |
+|---------------------|----------------------------------------------|
+| `Conta do BTG`       | número da conta                              |
+| `Código do Cliente`  | código do cliente (ex: `AOAK_MA`) — o BTG não exporta o nome completo aqui, só o código |
+| `Saldo`              | saldo em conta corrente (não investido)      |
+
+Um mesmo código de cliente pode aparecer em mais de uma linha, se tiver
+mais de uma conta — cada linha vira uma linha na tabela do e-mail.
+
+A planilha do BTG também traz outras abas (`Base BTG` com o patrimônio
+total, `Vencimentos RF` com o detalhe de renda fixa) que **não** são
+usadas por esta automação — ela lê só o saldo em conta corrente.
+
+## Múltiplos bankers (quando precisar)
+
+Hoje `banker_padrao` em `settings.yaml` é atribuído a toda linha do
+Excel, porque só existe um banker. Quando houver mais de um:
+
+1. Crie `config/clientes_banker.csv` com duas colunas: `codigo_cliente`,
+   `banker_id`.
+2. Em `src/saldos.py`, troque a linha `df["banker_id"] = banker_padrao`
+   por um `merge` desse DataFrame com o mapeamento código → banker
+   (usando `cliente` como chave), e trate cliente sem mapeamento como
+   pendência.
+
+O resto do fluxo (agrupamento por banker em `src/agrupador.py`, envio
+individual em `src/notify.py`, checagem de que ninguém recebe dado de
+outro banker) já funciona para qualquer quantidade de bankers — não
+precisa mudar.
 
 ## Como o acesso por banker é garantido
 
@@ -25,8 +60,8 @@ vê dados de clientes de outro banker.
 - Cada envio (`src/notify.py`) manda **um e-mail por vez**, com `To`
   contendo só o e-mail daquele banker — nunca em lote, nunca com
   CC/BCC juntando vários bankers.
-- Se um `banker_id` aparecer em `saldos.csv` sem e-mail cadastrado em
-  `bankers.csv`, os clientes dele **não são enviados para ninguém**
+- Se um `banker_id` não existir em `bankers.csv` (ou não tiver e-mail
+  cadastrado), os clientes dele **não são enviados para ninguém**
   nessa execução (em vez de arriscar mandar pro lugar errado) — o
   responsável pela automação é avisado por e-mail separadamente (veja
   `alerta_email` em `settings.yaml`).
@@ -35,7 +70,7 @@ vê dados de clientes de outro banker.
   pendências) antes de qualquer envio — se algo não bater, a execução é
   interrompida sem enviar nada.
 - Por padrão, os logs de execução (`logs/execucao.log`) **não** contêm
-  nome de cliente, conta nem saldo — só contagens e nomes de banker
+  código de cliente, conta nem saldo — só contagens e nomes de banker
   (configurável em `log_dados_sensiveis`, só pra depuração pontual).
 
 ## Instalação (Windows)
@@ -43,29 +78,30 @@ vê dados de clientes de outro banker.
 1. Instale o [Python](https://www.python.org/downloads/windows/) (marque
    "Add python.exe to PATH" no instalador), se ainda não tiver.
 2. Dê duplo clique em **`instalar.bat`**.
-3. Copie `config/saldos.example.csv` → `config/saldos.csv` e
-   `config/bankers.example.csv` → `config/bankers.csv`, e preencha com
-   os dados reais (ou aponte `saldos_csv`/`bankers_csv` em
-   `settings.yaml` para os arquivos que já existem no seu ambiente).
+3. Copie `config/bankers.example.csv` → `config/bankers.csv` e preencha
+   com o(s) banker(s) reais (`banker_id`, nome, e-mail).
 4. Copie `config/settings.example.yaml` → `config/settings.yaml` e
-   preencha os dados de SMTP da empresa em `email:` — **deixe
-   `email.modo_teste.ativo: true`** enquanto estiver testando (veja
-   abaixo).
+   ajuste:
+   - `saldos_xlsx`: caminho completo de onde você salva o Excel baixado
+     do BTG;
+   - `banker_padrao`: o `banker_id` (precisa ser um dos cadastrados em
+     `bankers.csv`);
+   - `email:` com os dados de SMTP da empresa — **deixe
+     `modo_teste.ativo: true`** enquanto estiver testando (veja abaixo).
 
 ## Testando antes de ativar de verdade
 
 Existem dois passos de teste, em ordem, antes de mandar e-mail real pro
 banker:
 
-1. **`testar.bat`** (dry-run) — não usa SMTP nenhum; grava o HTML de
-   cada banker em `saida_teste/<banker_id>.html` pra você abrir no
-   navegador e conferir o conteúdo.
+1. **`testar.bat`** (dry-run) — não usa SMTP nenhum; grava o HTML em
+   `saida_teste/<banker_id>.html` pra você abrir no navegador e conferir
+   o conteúdo.
 2. **`atualizar.bat` com `modo_teste.ativo: true`** — usa o SMTP de
-   verdade, mas redireciona todos os e-mails (de todos os bankers) para
-   o endereço em `modo_teste.enviar_para`, com um aviso no topo do
-   e-mail dizendo pra quem ele seria enviado de verdade. Isso valida a
-   configuração de SMTP de ponta a ponta sem expor dado de cliente pros
-   bankers reais.
+   verdade, mas redireciona todos os e-mails para o endereço em
+   `modo_teste.enviar_para`, com um aviso no topo do e-mail dizendo pra
+   quem ele seria enviado de verdade. Isso valida a configuração de
+   SMTP de ponta a ponta sem expor dado de cliente pros bankers reais.
 
 Só depois de conferir os dois, mude `modo_teste.ativo` para `false` em
 `settings.yaml` para começar o envio real.
@@ -81,32 +117,26 @@ Ou dê duplo clique em `atualizar.bat` / `testar.bat`.
 
 ## Agendando a execução automática (Windows Task Scheduler)
 
-1. Abra o **Agendador de Tarefas** do Windows → "Criar Tarefa Básica".
-2. Defina o gatilho (ex: todo dia, num horário depois que o arquivo de
-   saldos do custodiante já estiver disponível).
-3. Ação: "Iniciar um programa".
+1. Baixe o Excel do BTG e salve no caminho configurado em `saldos_xlsx`
+   **antes** do horário agendado (isso ainda é manual — veja "Próximos
+   passos possíveis" sobre automatizar o download).
+2. Abra o **Agendador de Tarefas** do Windows → "Criar Tarefa Básica".
+3. Defina o gatilho (ex: todo dia, num horário depois que você já tiver
+   salvo o Excel do dia).
+4. Ação: "Iniciar um programa".
    - Programa/script: caminho completo até `atualizar.bat`
      (ex: `C:\Automacoes\saldo-clientes-automacao\atualizar.bat`)
    - Adicionar argumentos: `silencioso`
    - Iniciar em: a pasta do projeto (ex:
      `C:\Automacoes\saldo-clientes-automacao`)
-4. Salve. A tarefa vai rodar sozinha, sem abrir janela nem esperar
+5. Salve. A tarefa vai rodar sozinha, sem abrir janela nem esperar
    clique.
-
-## Formato de `config/saldos.csv`
-
-| coluna      | descrição                                              |
-|-------------|---------------------------------------------------------|
-| `banker_id` | identificador do banker responsável (chave usada para casar com `bankers.csv`) |
-| `cliente`   | nome do cliente (ou razão social)                        |
-| `conta`     | número da conta                                          |
-| `saldo`     | saldo em conta (numérico)                                |
 
 ## Formato de `config/bankers.csv`
 
 | coluna         | descrição                          |
 |----------------|--------------------------------------|
-| `banker_id`    | mesmo identificador usado em `saldos.csv` |
+| `banker_id`    | identificador do banker (usado em `banker_padrao`, e futuramente em `clientes_banker.csv`) |
 | `banker_nome`  | nome exibido no e-mail                |
 | `email`        | endereço de e-mail do banker          |
 
@@ -114,16 +144,15 @@ Ou dê duplo clique em `atualizar.bat` / `testar.bat`.
 
 Com `manter_historico: true` (padrão), a cada envio real é gravada uma
 linha por banker em `historico/envios_diarios.csv` com data, banker,
-quantidade de clientes e saldo total — **sem** detalhe por cliente —
-para auditoria de que os e-mails foram enviados.
+quantidade de contas e saldo total — **sem** detalhe por cliente — para
+auditoria de que os e-mails foram enviados.
 
 ## Próximos passos possíveis
 
-- Trocar a fonte de `saldos.csv` por uma consulta direta a uma API do
-  custodiante ou a um banco de dados interno (o resto do fluxo não
-  muda — só a função que carrega o DataFrame em `src/saldos.py`).
+- Automatizar o download do Excel do BTG (se o BTG tiver uma API ou
+  portal com exportação agendável), eliminando o passo manual antes do
+  Agendador de Tarefas rodar.
+- Trocar o código do cliente por um nome legível no e-mail — é só
+  fornecer um mapeamento código → nome e ajustar `email_builder.py`.
+- Separar por múltiplos bankers (veja seção acima).
 - Anexar o saldo em Excel além do corpo do e-mail.
-- Enviar uma cópia consolidada (todos os clientes) para um gestor/sócio,
-  como um envio adicional e explicitamente separado dos e-mails por
-  banker — não reaproveitando o mesmo grupo, para manter o mesmo
-  princípio de "cada e-mail é montado para um destinatário específico".

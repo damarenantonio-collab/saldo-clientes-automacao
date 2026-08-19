@@ -40,7 +40,7 @@ def montar_corpo_html(grupo: GrupoBanker, titulo: str, data_referencia: date, av
       <table style="border-collapse:collapse;width:100%;max-width:640px;">
         <thead>
           <tr style="background:#f2f2f2;">
-            <th style="padding:6px 10px;text-align:left;">Cliente</th>
+            <th style="padding:6px 10px;text-align:left;">Cliente (código)</th>
             <th style="padding:6px 10px;text-align:left;">Conta</th>
             <th style="padding:6px 10px;text-align:right;">Saldo</th>
           </tr>
