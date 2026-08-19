@@ -65,7 +65,7 @@ def montar_corpo_html(
       <table style="border-collapse:collapse;width:100%;max-width:640px;border:1px solid {NAVY};">
         <thead>
           <tr style="background:{NAVY};">
-            <th style="{th_style}text-align:left;">Cliente (código)</th>
+            <th style="{th_style}text-align:left;">Cliente</th>
             <th style="{th_style}text-align:left;">Conta</th>
             <th style="{th_style}text-align:right;">Saldo</th>
           </tr>
