@@ -1,0 +1,27 @@
+# Configurações com dados reais (clientes, bankers, credenciais SMTP) — nunca versionar
+config/saldos.csv
+config/bankers.csv
+config/settings.yaml
+
+# Planilhas/CSVs locais que não sejam os exemplos
+*.xlsx
+*.xls
+
+# Saída de teste (dry-run) — pode conter dado de cliente em HTML local
+saida_teste/*.html
+
+# Histórico de envios (mesmo agregado, evite versionar por padrão)
+historico/*.csv
+
+# Logs
+logs/*.log
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+
+# OS
+.DS_Store

@@ -1,0 +1,56 @@
+# Copie este arquivo para settings.yaml e ajuste os valores.
+# settings.yaml NÃO é versionado (está no .gitignore) porque contém
+# credenciais de e-mail e caminhos de arquivos locais.
+
+# Caminho do arquivo com o saldo em conta de todos os clientes (gerado/exportado
+# pelo custodiante, backoffice, etc). Veja config/saldos.example.csv pro formato.
+saldos_csv: "config/saldos.csv"
+
+# Caminho do arquivo com o mapeamento banker -> e-mail. Veja
+# config/bankers.example.csv pro formato.
+bankers_csv: "config/bankers.csv"
+
+# Nome exibido no assunto e no corpo do e-mail (ex: nome do family office).
+titulo: "Horto Capital"
+
+# Assunto do e-mail. {banker} e {data} são substituídos automaticamente.
+assunto_template: "Saldo em conta dos clientes - {banker} - {data}"
+
+# --- Envio de e-mail (SMTP) ---
+email:
+  # Servidor SMTP corporativo. Exemplo abaixo é o do Gmail com "senha de
+  # app" (myaccount.google.com/apppasswords) — troque pelo SMTP da empresa
+  # quando tiver os dados (host/porta/usuário/senha do provedor corporativo).
+  smtp_host: "smtp.gmail.com"
+  smtp_port: 587
+  remetente: "relatorios@suaempresa.com.br"
+  senha: "xxxx xxxx xxxx xxxx"
+
+  # Modo teste: enquanto ativo=true, TODOS os e-mails (de todos os bankers)
+  # são redirecionados para "enviar_para", com um aviso no topo do corpo
+  # informando pra quem seria enviado de verdade. Use isso pra validar a
+  # automação de ponta a ponta (SMTP incluso) SEM expor dados de clientes
+  # pros bankers reais nem disparar e-mails de verdade pra eles.
+  modo_teste:
+    ativo: true
+    enviar_para: "voce@suaempresa.com.br"
+
+# E-mail(s) do(s) responsável(is) pela automação, avisado(s) em caso de
+# falha na execução ou de banker sem e-mail cadastrado. Nunca inclui dados
+# de clientes no corpo do alerta.
+alerta_email:
+  ativo: false
+  para: "voce@suaempresa.com.br"
+
+# Guarda um snapshot diário (por banker: quantidade de clientes e saldo
+# total, SEM detalhe por cliente) em historico/, pra auditoria de que os
+# e-mails foram enviados. Não é o mesmo que logar dados sensíveis (veja
+# log_dados_sensiveis abaixo).
+manter_historico: true
+historico_path: "historico/envios_diarios.csv"
+
+# Por padrão os logs de execução (logs/execucao.log) NÃO incluem nome de
+# cliente, conta nem saldo — só contagens e nomes de banker, pra reduzir
+# exposição de dado sensível em arquivo de log. Troque pra true só
+# temporariamente, para depurar um problema específico.
+log_dados_sensiveis: false
