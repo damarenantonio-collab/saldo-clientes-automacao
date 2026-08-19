@@ -24,8 +24,10 @@ bankers_csv: "config/bankers.csv"
 # Nome exibido no assunto e no corpo do e-mail (ex: nome do family office).
 titulo: "Horto Capital"
 
-# Assunto do e-mail. {banker} e {data} são substituídos automaticamente.
-assunto_template: "Saldo em conta dos clientes - {banker} - {data}"
+# Assunto do e-mail. {banker} e {data} são substituídos automaticamente
+# (banker fica disponível mesmo não estando no template padrão, caso
+# você queira reintroduzir no futuro).
+assunto_template: "Saldo em Conta - {data}"
 
 # --- Envio de e-mail (SMTP) ---
 email:
