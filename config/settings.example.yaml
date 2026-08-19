@@ -21,8 +21,8 @@ banker_padrao: "seu_banker_id"
 # config/bankers.example.csv pro formato.
 bankers_csv: "config/bankers.csv"
 
-# Nome exibido no assunto e no corpo do e-mail (ex: nome do family office).
-titulo: "Horto Capital"
+# Nome usado na assinatura do e-mail ("Att,\n<assinatura>").
+assinatura: "Antonio Carvalho"
 
 # Assunto do e-mail. {banker} e {data} são substituídos automaticamente
 # (banker fica disponível mesmo não estando no template padrão, caso

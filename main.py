@@ -84,8 +84,8 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
         return
 
     data_ref = date.today()
-    titulo = settings.get("titulo", "Saldo em conta")
-    assunto_template = settings.get("assunto_template", "Saldo em conta dos clientes - {banker} - {data}")
+    assinatura = settings["assinatura"]
+    assunto_template = settings.get("assunto_template", "Saldo em Conta - {data}")
 
     saida_teste = ROOT / "saida_teste"
     falhas = []
@@ -101,7 +101,7 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
         subject = assunto_template.format(banker=grupo.banker_nome, data=data_ref.strftime("%d/%m/%Y"))
 
         if dry_run:
-            html_body = email_builder.montar_corpo_html(grupo, titulo, data_ref)
+            html_body = email_builder.montar_corpo_html(grupo, assinatura, data_ref)
             saida_teste.mkdir(parents=True, exist_ok=True)
             destino = saida_teste / f"{grupo.banker_id}.html"
             destino.write_text(html_body, encoding="utf-8")
@@ -113,7 +113,7 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
                 settings["email"],
                 grupo,
                 subject,
-                lambda aviso, g=grupo: email_builder.montar_corpo_html(g, titulo, data_ref, aviso_teste=aviso),
+                lambda aviso, g=grupo: email_builder.montar_corpo_html(g, assinatura, data_ref, aviso_teste=aviso),
             )
         except Exception as exc:
             logger.error("Falha ao enviar e-mail para banker %s: %s", grupo.banker_id, exc, exc_info=True)
