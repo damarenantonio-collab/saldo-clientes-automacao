@@ -8,6 +8,7 @@ Uso:
 """
 
 import argparse
+import base64
 import logging
 import sys
 import traceback
@@ -16,7 +17,7 @@ from pathlib import Path
 
 import yaml
 
-from src import agrupador, bankers, email_builder, history_log, notify, saldos
+from src import agrupador, bankers, email_builder, history_log, notify, saldos, tabela_imagem
 
 ROOT = Path(__file__).resolve().parent
 
@@ -99,9 +100,12 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
             logger.info("Banker %s: %d cliente(s).", grupo.banker_nome, qtd)
 
         subject = assunto_template.format(banker=grupo.banker_nome, data=data_ref.strftime("%d/%m/%Y"))
+        imagem_png = tabela_imagem.gerar_png(grupo)
+        cid = f"tabela-{grupo.banker_id}"
 
         if dry_run:
-            html_body = email_builder.montar_corpo_html(grupo, assinatura, data_ref)
+            data_uri = "data:image/png;base64," + base64.b64encode(imagem_png).decode("ascii")
+            html_body = email_builder.montar_corpo_html(grupo, assinatura, data_ref, data_uri)
             saida_teste.mkdir(parents=True, exist_ok=True)
             destino = saida_teste / f"{grupo.banker_id}.html"
             destino.write_text(html_body, encoding="utf-8")
@@ -113,7 +117,11 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
                 settings["email"],
                 grupo,
                 subject,
-                lambda aviso, g=grupo: email_builder.montar_corpo_html(g, assinatura, data_ref, aviso_teste=aviso),
+                imagem_png,
+                cid,
+                lambda aviso, g=grupo, c=cid: email_builder.montar_corpo_html(
+                    g, assinatura, data_ref, f"cid:{c}", aviso_teste=aviso
+                ),
             )
         except Exception as exc:
             logger.error("Falha ao enviar e-mail para banker %s: %s", grupo.banker_id, exc, exc_info=True)

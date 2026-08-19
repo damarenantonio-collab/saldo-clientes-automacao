@@ -76,6 +76,24 @@ individual em `src/notify.py`, checagem de que ninguém recebe dado de
 outro banker) já funciona para qualquer quantidade de bankers — não
 precisa mudar.
 
+## Tabela como imagem (não editável)
+
+A tabela de saldo não vai como HTML no e-mail — vem como imagem PNG
+(`src/tabela_imagem.py`, gerada com Pillow), embutida no e-mail como
+anexo inline (`Content-ID`, referenciado via `cid:` no HTML — é o jeito
+que funciona de forma confiável no Outlook, diferente de imagem em
+base64 direto no HTML). O texto acima e abaixo da tabela continua sendo
+HTML normal, em tamanho 11 (`font-size:11pt`).
+
+Isso é proposital: como imagem, o conteúdo não pode ser editado por
+quem recebe o e-mail antes de encaminhar — diferente de uma tabela em
+texto/HTML, que pode ter célula ou valor alterado.
+
+A imagem usa a mesma fonte do texto (Georgia). O gerador procura
+`C:/Windows/Fonts/georgia.ttf` (padrão no Windows) e cai pra uma fonte
+serifada genérica se não encontrar — então funciona em qualquer
+máquina, mas fica visualmente mais fiel no Windows.
+
 ## Como o acesso por banker é garantido
 
 - O agrupamento (`src/agrupador.py`) nunca produz um "grupo" com dados

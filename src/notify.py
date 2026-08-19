@@ -10,6 +10,7 @@ e-mail daquele banker — nunca em lote/CC/BCC com outros bankers juntos.
 
 import logging
 import smtplib
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -18,12 +19,28 @@ from .agrupador import GrupoBanker
 logger = logging.getLogger(__name__)
 
 
-def _smtp_send(cfg: dict, destinatario: str, subject: str, html_body: str) -> None:
-    msg = MIMEMultipart("alternative")
+def _smtp_send(
+    cfg: dict,
+    destinatario: str,
+    subject: str,
+    html_body: str,
+    imagem_png: bytes | None = None,
+    imagem_cid: str | None = None,
+) -> None:
+    msg = MIMEMultipart("related")
     msg["Subject"] = subject
     msg["From"] = cfg["remetente"]
     msg["To"] = destinatario
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    alternativo = MIMEMultipart("alternative")
+    alternativo.attach(MIMEText(html_body, "html", "utf-8"))
+    msg.attach(alternativo)
+
+    if imagem_png is not None:
+        imagem = MIMEImage(imagem_png)
+        imagem.add_header("Content-ID", f"<{imagem_cid}>")
+        imagem.add_header("Content-Disposition", "inline", filename="saldo.png")
+        msg.attach(imagem)
 
     host = cfg.get("smtp_host", "smtp.gmail.com")
     port = int(cfg.get("smtp_port", 587))
@@ -34,11 +51,19 @@ def _smtp_send(cfg: dict, destinatario: str, subject: str, html_body: str) -> No
         server.sendmail(cfg["remetente"], [destinatario], msg.as_string())
 
 
-def enviar_email_banker(email_cfg: dict, grupo: GrupoBanker, subject: str, html_body_factory) -> None:
+def enviar_email_banker(
+    email_cfg: dict,
+    grupo: GrupoBanker,
+    subject: str,
+    imagem_png: bytes,
+    imagem_cid: str,
+    html_body_factory,
+) -> None:
     """Envia (ou simula, em modo teste) o e-mail de saldo de um banker.
 
-    `html_body_factory(aviso_teste)` monta o corpo — recebe o aviso a
-    exibir no topo quando em modo teste, ou None em envio real.
+    `html_body_factory(aviso_teste)` monta o corpo (referenciando a
+    tabela como `cid:<imagem_cid>`) — recebe o aviso a exibir no topo
+    quando em modo teste, ou None em envio real.
     """
     modo_teste = (email_cfg.get("modo_teste") or {}).get("ativo", False)
 
@@ -51,7 +76,7 @@ def enviar_email_banker(email_cfg: dict, grupo: GrupoBanker, subject: str, html_
         aviso = None
 
     html_body = html_body_factory(aviso)
-    _smtp_send(email_cfg, destinatario, subject, html_body)
+    _smtp_send(email_cfg, destinatario, subject, html_body, imagem_png=imagem_png, imagem_cid=imagem_cid)
     logger.info(
         "E-mail de saldo enviado: banker=%s destinatario=%s modo_teste=%s",
         grupo.banker_id,
