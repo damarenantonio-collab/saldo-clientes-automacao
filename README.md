@@ -35,6 +35,30 @@ A planilha do BTG também traz outras abas (`Base BTG` com o patrimônio
 total, `Vencimentos RF` com o detalhe de renda fixa) que **não** são
 usadas por esta automação — ela lê só o saldo em conta corrente.
 
+## Revisão manual antes de chegar ao banker (relay)
+
+Por definição do family office, o e-mail não vai direto para o banker
+final — ele passa primeiro por uma caixa de revisão (hoje, o e-mail
+profissional de quem administra a automação), e essa pessoa encaminha
+manualmente para o banker depois. Isso é permanente, não uma etapa de
+teste a ser removida depois.
+
+Isso é implementado sem nenhuma lógica especial: o campo `email` em
+`bankers.csv` é o endereço de **entrega** da automação, que pode ser
+diferente do e-mail do próprio banker — o `banker_nome` (usado na
+saudação, "Bom dia Fulano") continua sendo o do banker de verdade. Ou
+seja, a linha de um banker em `bankers.csv` pode legitimamente apontar
+pra caixa de outra pessoa; não é um erro de configuração.
+
+```csv
+banker_id,banker_nome,email
+vbrandao,Viviane,acarvalho@hortocapital.com.br
+```
+
+Se um dia quiser que a automação envie direto pro banker (pulando a
+revisão manual), é só trocar esse `email` pelo e-mail do próprio
+banker — mas isso é opcional, não o destino "final" do projeto.
+
 ## Múltiplos bankers (quando precisar)
 
 Hoje `banker_padrao` em `settings.yaml` é atribuído a toda linha do
@@ -104,7 +128,9 @@ banker:
    SMTP de ponta a ponta sem expor dado de cliente pros bankers reais.
 
 Só depois de conferir os dois, mude `modo_teste.ativo` para `false` em
-`settings.yaml` para começar o envio real.
+`settings.yaml` para começar o envio real — que continua indo pro
+endereço configurado em `bankers.csv` (veja "Revisão manual antes de
+chegar ao banker" acima), só sem o banner de aviso.
 
 ## Rodando manualmente
 
@@ -137,8 +163,8 @@ Ou dê duplo clique em `atualizar.bat` / `testar.bat`.
 | coluna         | descrição                          |
 |----------------|--------------------------------------|
 | `banker_id`    | identificador do banker (usado em `banker_padrao`, e futuramente em `clientes_banker.csv`) |
-| `banker_nome`  | nome exibido no e-mail                |
-| `email`        | endereço de e-mail do banker          |
+| `banker_nome`  | nome usado na saudação do e-mail ("Bom dia \<nome\>") — sempre o do banker de verdade |
+| `email`        | endereço de **entrega** — pode ser o do próprio banker, ou o de uma caixa de revisão que encaminha manualmente depois (veja "Revisão manual antes de chegar ao banker") |
 
 ## Histórico
 
