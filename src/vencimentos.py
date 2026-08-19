@@ -17,12 +17,14 @@ ALIASES_COLUNA = {
     "conta btg": "conta",
     "codigo do cliente": "cliente",
     "emissor": "emissor",
-    "ativo": "ativo",
+    "produto": "produto",
+    "indexador": "indexador",
     "vencimento": "vencimento",
     "valor liquido - curva cliente": "valor_liquido",
 }
 
-COLUNAS_INTERNAS = ["conta", "cliente", "emissor", "ativo", "vencimento", "valor_liquido"]
+COLUNAS_INTERNAS = ["conta", "cliente", "produto", "emissor", "indexador", "vencimento", "valor_liquido"]
+COLUNAS_TEXTO = ["conta", "cliente", "produto", "emissor", "indexador"]
 
 
 def _normalizar(texto: str) -> str:
@@ -39,8 +41,8 @@ def load_vencimentos(
     """Lê a aba de vencimentos de renda fixa e retorna só as linhas cujo
     vencimento cai no mês/ano de `mes_ref` (o dia de `mes_ref` é ignorado).
 
-    Colunas do resultado: `banker_id`, `conta`, `cliente`, `emissor`,
-    `ativo`, `vencimento`, `valor_liquido`.
+    Colunas do resultado: `banker_id`, `conta`, `cliente`, `produto`,
+    `emissor`, `indexador`, `vencimento`, `valor_liquido`.
     """
     bruto = pd.read_excel(planilha_xlsx, sheet_name=sheet_name)
 
@@ -60,10 +62,8 @@ def load_vencimentos(
         )
 
     df = df[COLUNAS_INTERNAS].copy()
-    df["conta"] = df["conta"].astype(str).str.strip()
-    df["cliente"] = df["cliente"].astype(str).str.strip()
-    df["emissor"] = df["emissor"].astype(str).str.strip()
-    df["ativo"] = df["ativo"].astype(str).str.strip()
+    for coluna in COLUNAS_TEXTO:
+        df[coluna] = df[coluna].astype(str).str.strip()
     df["vencimento"] = pd.to_datetime(df["vencimento"], errors="coerce")
     df["valor_liquido"] = pd.to_numeric(df["valor_liquido"], errors="coerce")
 

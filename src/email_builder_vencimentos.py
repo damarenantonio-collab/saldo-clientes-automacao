@@ -10,7 +10,7 @@ from .email_base import montar_corpo_html as _montar_corpo_html
 from .email_base import primeiro_nome
 from .meses import nome_mes
 
-LARGURA_IMAGEM = 760
+LARGURA_IMAGEM = 800
 
 
 def montar_corpo_html(

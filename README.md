@@ -46,10 +46,10 @@ usadas por este boletim — ele lê só o saldo em conta corrente.
 
 Lê a aba **"Vencimentos RF"** da mesma planilha do BTG e envia, uma vez
 por mês, a lista de ativos de renda fixa que vencem naquele mês —
-Cliente, Ativo, Emissor, Vencimento e Valor Líquido (curva cliente).
-Se nenhum ativo vencer no mês, o e-mail ainda é enviado, só que sem
-tabela (avisando que não há vencimento naquele mês) — em vez de ficar
-em silêncio, o que poderia parecer que a automação quebrou.
+Cliente, Produto, Emissor, Indexador, Vencimento e Valor Líquido (curva
+cliente). Se nenhum ativo vencer no mês, o e-mail ainda é enviado, só
+que sem tabela (avisando que não há vencimento naquele mês) — em vez
+de ficar em silêncio, o que poderia parecer que a automação quebrou.
 
 Colunas lidas da aba (nomes toleram pequena variação, igual ao saldo):
 
@@ -57,10 +57,15 @@ Colunas lidas da aba (nomes toleram pequena variação, igual ao saldo):
 |----------------------------------|------------------------------------------|
 | `Conta BTG`                      | número da conta                          |
 | `Código do Cliente`               | código do cliente                        |
+| `Produto`                         | tipo do ativo (ex: `CDB`, `LCI`, `CRI`)  |
 | `Emissor`                         | nome do emissor do ativo                 |
-| `Ativo`                           | identificador do ativo (ex: `CDB-CDB1234AB1D`) |
+| `Indexador`                       | referência de rentabilidade (ex: `110% CDI`) |
 | `Vencimento`                      | data de vencimento — usada pra filtrar o mês |
 | `Valor Líquido - Curva Cliente`   | valor mostrado na tabela                 |
+
+A coluna `Ativo` (identificador interno, ex: `CDB-CDB1234AB1D`) existe
+na planilha mas não aparece no e-mail — não agrega informação pra
+quem lê, só polui a tabela.
 
 ### Qual mês é enviado
 

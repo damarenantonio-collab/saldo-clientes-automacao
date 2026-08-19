@@ -9,21 +9,18 @@ from PIL import Image, ImageDraw
 from .agrupador import GrupoBanker
 from .imagem_util import BRANCO, FONTES_BOLD, FONTES_REGULAR, NAVY, NAVY_CLARO, carregar_fonte, escrever, fmt_moeda, truncar
 
-LARGURA = 760
+LARGURA = 800
 ALTURA_LINHA = 36
 ALTURA_FAIXA = 40
 PADDING_X = 10
 
 COL_CLIENTE = 0
-COL_ATIVO = 90
-COL_EMISSOR = 250
-COL_VENCIMENTO = 470
-# da COL_VENCIMENTO até a margem direita fica o espaço do valor
-# (alinhado à direita) — medido com Pillow pra não sobrepor o
-# cabeçalho "VENCIMENTO" (97px) com "VALOR LÍQUIDO" (112px)
+COL_PRODUTO = 90
+COL_EMISSOR = 180
+COL_INDEXADOR = 410
+COL_VENCIMENTO = 520
 
-LARGURA_ATIVO = COL_EMISSOR - COL_ATIVO - PADDING_X
-LARGURA_EMISSOR = COL_VENCIMENTO - COL_EMISSOR - PADDING_X
+LARGURA_EMISSOR = COL_INDEXADOR - COL_EMISSOR - PADDING_X
 
 
 def gerar_png(grupo: GrupoBanker, tamanho_fonte: int = 12) -> bytes:
@@ -39,8 +36,9 @@ def gerar_png(grupo: GrupoBanker, tamanho_fonte: int = 12) -> bytes:
 
     draw.rectangle([0, 0, LARGURA - 1, ALTURA_FAIXA - 1], fill=NAVY)
     escrever(draw, COL_CLIENTE + PADDING_X, 0, ALTURA_FAIXA, "CLIENTE", fonte_bold, BRANCO)
-    escrever(draw, COL_ATIVO + PADDING_X, 0, ALTURA_FAIXA, "ATIVO", fonte_bold, BRANCO)
+    escrever(draw, COL_PRODUTO + PADDING_X, 0, ALTURA_FAIXA, "PRODUTO", fonte_bold, BRANCO)
     escrever(draw, COL_EMISSOR + PADDING_X, 0, ALTURA_FAIXA, "EMISSOR", fonte_bold, BRANCO)
+    escrever(draw, COL_INDEXADOR + PADDING_X, 0, ALTURA_FAIXA, "INDEXADOR", fonte_bold, BRANCO)
     escrever(draw, COL_VENCIMENTO + PADDING_X, 0, ALTURA_FAIXA, "VENCIMENTO", fonte_bold, BRANCO)
     escrever(draw, 0, 0, ALTURA_FAIXA, "VALOR LÍQUIDO", fonte_bold, BRANCO, alinhar_direita_em=margem_direita)
 
@@ -48,10 +46,11 @@ def gerar_png(grupo: GrupoBanker, tamanho_fonte: int = 12) -> bytes:
     for _, row in grupo.clientes.iterrows():
         y0, y1 = y, y + ALTURA_LINHA
         escrever(draw, COL_CLIENTE + PADDING_X, y0, y1, str(row["cliente"]), fonte, NAVY)
-        escrever(draw, COL_ATIVO + PADDING_X, y0, y1, truncar(draw, str(row["ativo"]), fonte, LARGURA_ATIVO), fonte, NAVY)
+        escrever(draw, COL_PRODUTO + PADDING_X, y0, y1, str(row["produto"]), fonte, NAVY)
         escrever(
             draw, COL_EMISSOR + PADDING_X, y0, y1, truncar(draw, str(row["emissor"]), fonte, LARGURA_EMISSOR), fonte, NAVY
         )
+        escrever(draw, COL_INDEXADOR + PADDING_X, y0, y1, str(row["indexador"]), fonte, NAVY)
         escrever(draw, COL_VENCIMENTO + PADDING_X, y0, y1, row["vencimento"].strftime("%d/%m/%Y"), fonte, NAVY)
         escrever(draw, 0, y0, y1, fmt_moeda(row["valor_liquido"]), fonte, NAVY, alinhar_direita_em=margem_direita)
         draw.line([(0, y1 - 1), (LARGURA, y1 - 1)], fill=NAVY_CLARO, width=1)
