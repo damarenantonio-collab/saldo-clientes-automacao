@@ -1,8 +1,19 @@
-"""Monta o corpo HTML do e-mail de saldo para um único banker."""
+"""Monta o corpo HTML do e-mail de saldo para um único banker.
+
+Estilo: fonte serifada (mais formal, no tom de um family office) e
+paleta azul-marinho/branco. Tudo em CSS inline — clientes de e-mail
+(Outlook em especial) ignoram <style> e @font-face, então cada elemento
+carrega seu próprio estilo.
+"""
 
 from datetime import date
 
 from .agrupador import GrupoBanker
+
+FONTE = "Georgia, 'Times New Roman', Times, serif"
+NAVY = "#0B1F3B"
+NAVY_CLARO = "#D9DFEA"  # bordas e linhas sutis
+BRANCO = "#FFFFFF"
 
 
 def _fmt_moeda(valor: float) -> str:
@@ -23,9 +34,9 @@ def montar_corpo_html(
 ) -> str:
     linhas = "".join(
         f"<tr>"
-        f"<td style='padding:6px 10px;border-bottom:1px solid #e5e5e5;'>{cliente}</td>"
-        f"<td style='padding:6px 10px;border-bottom:1px solid #e5e5e5;'>{conta}</td>"
-        f"<td style='padding:6px 10px;border-bottom:1px solid #e5e5e5;text-align:right;'>{_fmt_moeda(saldo)}</td>"
+        f"<td style='padding:8px 10px;border-bottom:1px solid {NAVY_CLARO};color:{NAVY};'>{cliente}</td>"
+        f"<td style='padding:8px 10px;border-bottom:1px solid {NAVY_CLARO};color:{NAVY};'>{conta}</td>"
+        f"<td style='padding:8px 10px;border-bottom:1px solid {NAVY_CLARO};color:{NAVY};text-align:right;'>{_fmt_moeda(saldo)}</td>"
         f"</tr>"
         for cliente, conta, saldo in zip(
             grupo.clientes["cliente"], grupo.clientes["conta"], grupo.clientes["saldo"]
@@ -34,39 +45,44 @@ def montar_corpo_html(
 
     total = grupo.clientes["saldo"].sum()
     banner_teste = (
-        f"<p style='background:#fff3cd;padding:8px 12px;border:1px solid #ffe69c;'>"
-        f"<b>[MODO TESTE]</b> {aviso_teste}</p>"
+        f"<p style='background:#fff3cd;padding:8px 12px;border:1px solid #ffe69c;"
+        f"font-family:{FONTE};'><b>[MODO TESTE]</b> {aviso_teste}</p>"
         if aviso_teste
         else ""
     )
 
+    th_style = (
+        f"padding:10px;color:{BRANCO};"
+        f"text-transform:uppercase;letter-spacing:0.04em;font-size:12px;font-weight:normal;"
+    )
+
     return f"""
     <html>
-    <body style="font-family:Arial,Helvetica,sans-serif;color:#222;">
+    <body style="font-family:{FONTE};color:{NAVY};background:{BRANCO};">
       {banner_teste}
       <p>Bom dia {_primeiro_nome(grupo.banker_nome)}, tudo bem?</p>
       <p>Segue abaixo, o saldo diário referente aos seus clientes no BTG.</p>
-      <table style="border-collapse:collapse;width:100%;max-width:640px;">
+      <table style="border-collapse:collapse;width:100%;max-width:640px;border:1px solid {NAVY};">
         <thead>
-          <tr style="background:#f2f2f2;">
-            <th style="padding:6px 10px;text-align:left;">Cliente (código)</th>
-            <th style="padding:6px 10px;text-align:left;">Conta</th>
-            <th style="padding:6px 10px;text-align:right;">Saldo</th>
+          <tr style="background:{NAVY};">
+            <th style="{th_style}text-align:left;">Cliente (código)</th>
+            <th style="{th_style}text-align:left;">Conta</th>
+            <th style="{th_style}text-align:right;">Saldo</th>
           </tr>
         </thead>
         <tbody>
           {linhas}
         </tbody>
         <tfoot>
-          <tr style="font-weight:bold;">
-            <td style="padding:8px 10px;" colspan="2">Total ({len(grupo.clientes)} cliente(s))</td>
-            <td style="padding:8px 10px;text-align:right;">{_fmt_moeda(total)}</td>
+          <tr style="background:{NAVY};color:{BRANCO};font-weight:bold;">
+            <td style="padding:10px;" colspan="2">Total ({len(grupo.clientes)} cliente(s))</td>
+            <td style="padding:10px;text-align:right;">{_fmt_moeda(total)}</td>
           </tr>
         </tfoot>
       </table>
       <p style="margin-top:20px;">Att,</p>
       <p>{assinatura}</p>
-      <p style="color:#777;font-size:12px;margin-top:16px;">
+      <p style="color:#6B7A94;font-size:12px;margin-top:16px;font-style:italic;">
         E-mail gerado automaticamente. Contém informação confidencial — não encaminhe.
       </p>
     </body>
