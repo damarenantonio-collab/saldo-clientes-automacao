@@ -1,11 +1,11 @@
-"""Envio dos e-mails de saldo (um por banker) e alertas de falha por SMTP.
+"""Envio dos e-mails (um por banker) e alertas de falha por SMTP.
 
 Usa SMTP simples — funciona com Gmail usando uma "senha de app" (não a
 senha normal da conta; crie uma em myaccount.google.com/apppasswords), ou
 com o SMTP corporativo da empresa (host/porta/usuário/senha próprios).
 
-Cada e-mail de saldo é enviado individualmente, com "To" contendo só o
-e-mail daquele banker — nunca em lote/CC/BCC com outros bankers juntos.
+Cada e-mail é enviado individualmente, com "To" contendo só o e-mail
+daquele banker — nunca em lote/CC/BCC com outros bankers juntos.
 """
 
 import logging
@@ -24,9 +24,10 @@ def _smtp_send(
     destinatario: str,
     subject: str,
     html_body: str,
-    imagem_png: bytes | None = None,
-    imagem_cid: str | None = None,
+    imagens: list[tuple[bytes, str]] | None = None,
 ) -> None:
+    """`imagens` é uma lista de (png_bytes, cid) — uma por tabela embutida
+    no e-mail (o boletim combinado tem duas: saldo e vencimentos)."""
     msg = MIMEMultipart("related")
     msg["Subject"] = subject
     msg["From"] = cfg["remetente"]
@@ -36,10 +37,10 @@ def _smtp_send(
     alternativo.attach(MIMEText(html_body, "html", "utf-8"))
     msg.attach(alternativo)
 
-    if imagem_png is not None:
+    for imagem_png, cid in imagens or []:
         imagem = MIMEImage(imagem_png)
-        imagem.add_header("Content-ID", f"<{imagem_cid}>")
-        imagem.add_header("Content-Disposition", "inline", filename="saldo.png")
+        imagem.add_header("Content-ID", f"<{cid}>")
+        imagem.add_header("Content-Disposition", "inline", filename=f"{cid}.png")
         msg.attach(imagem)
 
     host = cfg.get("smtp_host", "smtp.gmail.com")
@@ -55,16 +56,15 @@ def enviar_email_banker(
     email_cfg: dict,
     grupo: GrupoBanker,
     subject: str,
-    imagem_png: bytes | None,
-    imagem_cid: str,
+    imagens: list[tuple[bytes, str]],
     html_body_factory,
 ) -> None:
     """Envia (ou simula, em modo teste) o e-mail de um banker.
 
-    `html_body_factory(aviso_teste)` monta o corpo (referenciando a
-    tabela como `cid:<imagem_cid>`) — recebe o aviso a exibir no topo
-    quando em modo teste, ou None em envio real. `imagem_png=None`
-    quando não há tabela pra anexar (ex: nenhum vencimento no mês).
+    `html_body_factory(aviso_teste)` monta o corpo (referenciando cada
+    tabela como `cid:<cid>`, usando o mesmo `cid` passado em `imagens`)
+    — recebe o aviso a exibir no topo quando em modo teste, ou None em
+    envio real. `imagens=[]` quando não há tabela nenhuma pra anexar.
     """
     modo_teste = (email_cfg.get("modo_teste") or {}).get("ativo", False)
 
@@ -77,9 +77,9 @@ def enviar_email_banker(
         aviso = None
 
     html_body = html_body_factory(aviso)
-    _smtp_send(email_cfg, destinatario, subject, html_body, imagem_png=imagem_png, imagem_cid=imagem_cid)
+    _smtp_send(email_cfg, destinatario, subject, html_body, imagens=imagens)
     logger.info(
-        "E-mail de saldo enviado: banker=%s destinatario=%s modo_teste=%s",
+        "E-mail enviado: banker=%s destinatario=%s modo_teste=%s",
         grupo.banker_id,
         destinatario,
         modo_teste,

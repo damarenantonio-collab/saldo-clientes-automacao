@@ -24,18 +24,28 @@ bankers_csv: "config/bankers.csv"
 # Nome usado na assinatura do e-mail ("Att,\n<assinatura>").
 assinatura: "Antonio Carvalho"
 
-# Assunto do e-mail. {banker} e {data} são substituídos automaticamente
-# (banker fica disponível mesmo não estando no template padrão, caso
-# você queira reintroduzir no futuro).
+# Assunto do e-mail nos dias normais. {banker} e {data} são substituídos
+# automaticamente (banker fica disponível mesmo não estando no template
+# padrão, caso você queira reintroduzir no futuro).
 assunto_template: "Saldo em Conta - {data}"
 
-# --- Boletim de vencimentos (vencimentos_mensal.py) ---
+# Assunto do e-mail no primeiro dia útil do mês, quando a seção de
+# vencimentos entra junto (veja "vencimentos_sheet" abaixo). {data} é
+# substituído automaticamente.
+assunto_template_combinado: "Saldo em Conta e Vencimentos do Mês - {data}"
+
+# --- Vencimentos de renda fixa ---
 # Aba do Excel do BTG (mesmo arquivo do saldo, veja saldos_xlsx acima)
-# com os vencimentos de renda fixa.
+# com os vencimentos de renda fixa. No primeiro dia útil do mês, main.py
+# lê essa aba e inclui os vencimentos do mês no mesmo e-mail do saldo —
+# não é um envio separado. vencimentos_mensal.py só existe como
+# ferramenta manual pra testar/pré-visualizar essa seção sem esperar o
+# dia certo (veja o README).
 vencimentos_sheet: "Vencimentos RF"
 
-# Assunto do e-mail mensal de vencimentos. {mes_ano} é substituído
-# automaticamente (ex: "Agosto/2026").
+# Assunto usado só quando vencimentos_mensal.py roda manualmente (fora
+# do fluxo automático). {mes_ano} é substituído automaticamente (ex:
+# "Agosto/2026").
 assunto_template_vencimentos: "Vencimentos do Mês - {mes_ano}"
 
 # --- Envio de e-mail (SMTP) ---

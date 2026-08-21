@@ -1,16 +1,14 @@
-"""Envia por e-mail os vencimentos de renda fixa do mês — um e-mail por
-banker, contendo apenas os vencimentos dos clientes daquele banker.
+"""Ferramenta manual pra testar/pré-visualizar o boletim de vencimentos
+de um mês específico, isoladamente.
 
-Pensado pra rodar todo dia útil (o Agendador de Tarefas do Windows não
-tem um gatilho nativo de "primeiro dia útil do mês"): o script mesmo
-decide se hoje é esse dia e só envia nesse caso. Nos outros dias, sai
-sem fazer nada e sem erro.
+No dia a dia, a automação NÃO chama este script — a seção de
+vencimentos sai embutida no e-mail de saldo (main.py), só no primeiro
+dia útil do mês. Este script serve pra conferir como aquela seção vai
+ficar sem precisar esperar o dia certo (--mes/--ano simulam o mês).
 
 Uso:
-    python vencimentos_mensal.py [--config config/settings.yaml]
-    python vencimentos_mensal.py --dry-run
-    python vencimentos_mensal.py --mes 10 --ano 2026   # simula outro mês (pra teste)
-    python vencimentos_mensal.py --forcar               # ignora a checagem de dia útil
+    python vencimentos_mensal.py --dry-run --mes 10 --ano 2026
+    python vencimentos_mensal.py --mes 10 --ano 2026   # envia de verdade (cai no seu relay)
 """
 
 import argparse
@@ -18,29 +16,16 @@ import base64
 import logging
 import sys
 import traceback
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 import yaml
 
 from src import agrupador, bankers, email_builder_vencimentos, notify, tabela_vencimentos_imagem, vencimentos
+from src.dias_uteis import eh_primeiro_dia_util, primeiro_dia_util
 from src.meses import nome_mes
 
 ROOT = Path(__file__).resolve().parent
-
-
-def primeiro_dia_util(ano: int, mes: int) -> date:
-    dia = date(ano, mes, 1)
-    while dia.weekday() >= 5:  # 5=sábado, 6=domingo
-        dia += timedelta(days=1)
-    return dia
-
-
-def eh_primeiro_dia_util(hoje: date) -> bool:
-    """Não considera feriados — só fins de semana. Se um feriado cair no
-    que seria o primeiro dia útil, ajuste manualmente rodando com
-    --forcar no dia certo, ou pulando esse mês."""
-    return hoje == primeiro_dia_util(hoje.year, hoje.month)
 
 
 def setup_logging(log_dir: Path) -> logging.Logger:
@@ -86,9 +71,6 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool, mes_ref: date) ->
     logger.info("Carregado(s) %d vencimento(s) de renda fixa para %s.", len(df_venc), mes_ano)
 
     if df_venc.empty:
-        # Sem vencimentos no mês: ainda assim envia um e-mail (informativo,
-        # "nada vence esse mês") pra cada banker cadastrado, em vez de ficar
-        # em silêncio — silêncio poderia ser confundido com falha.
         grupos = [
             agrupador.GrupoBanker(banker_id=bid, banker_nome=info["nome"], email=info["email"], clientes=df_venc)
             for bid, info in mapa_bankers.items()
@@ -142,13 +124,13 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool, mes_ref: date) ->
             logger.info("[DRY-RUN] E-mail de vencimentos de %s gravado em %s (nada foi enviado).", grupo.banker_nome, destino)
             continue
 
+        imagens = [(imagem_png, cid)] if imagem_png is not None else []
         try:
             notify.enviar_email_banker(
                 settings["email"],
                 grupo,
                 subject,
-                imagem_png,
-                cid,
+                imagens,
                 lambda aviso, g=grupo, c=cid, img=imagem_png: email_builder_vencimentos.montar_corpo_html(
                     g, assinatura, mes_ref, (f"cid:{c}" if img is not None else None), aviso_teste=aviso
                 ),
@@ -202,8 +184,8 @@ def main() -> None:
 
     if not args.dry_run and not args.forcar and not mes_simulado and not eh_primeiro_dia_util(hoje):
         logger.info(
-            "Hoje (%s) não é o primeiro dia útil do mês (seria %s) — nada enviado. "
-            "Use --forcar para enviar mesmo assim.",
+            "Hoje (%s) não é o primeiro dia útil do mês (seria %s) — nada enviado por este script "
+            "(no dia a dia, main.py já cuida disso). Use --forcar para enviar mesmo assim.",
             hoje.isoformat(),
             primeiro_dia_util(hoje.year, hoje.month).isoformat(),
         )

@@ -1,17 +1,16 @@
 # Saldo Clientes — Automação
 
-Dois boletins por e-mail, a partir do mesmo Excel que o BTG
+Um único e-mail diário (`main.py`), a partir do Excel que o BTG
 disponibiliza (`Saldo_em_CC_BTG.xlsx`):
 
-- **`main.py`** — saldo em conta corrente, todo dia (aba "Saldo Diário").
-- **`vencimentos_mensal.py`** — vencimentos de renda fixa do mês, uma
-  vez por mês, no primeiro dia útil (aba "Vencimentos RF").
+- **Todo dia**: saldo em conta corrente (aba "Saldo Diário").
+- **No primeiro dia útil do mês**: o mesmo e-mail também inclui os
+  vencimentos de renda fixa daquele mês (aba "Vencimentos RF") — não é
+  um segundo e-mail, é uma seção a mais no mesmo envio.
 
 Hoje há um único banker e todos os clientes são dele; a estrutura já
 está pronta para, no futuro, separar por banker sem reescrever nada
-(veja "Múltiplos bankers" abaixo). Os dois boletins compartilham
-configuração (`settings.yaml`, `bankers.csv`, SMTP) e o mesmo estilo
-visual (fonte, cores, tabela como imagem) — o que muda é só o conteúdo.
+(veja "Múltiplos bankers" abaixo).
 
 ## Boletim de saldo (main.py) — como funciona (resumo)
 
@@ -21,8 +20,10 @@ visual (fonte, cores, tabela como imagem) — o que muda é só o conteúdo.
    o `banker_id` responsável por todo o arquivo (`banker_padrao`).
 3. `config/bankers.csv` tem o e-mail de cada banker (hoje, uma linha só).
 4. Ao rodar `python main.py`, o script lê a aba "Saldo Diário", monta um
-   e-mail HTML com todas as contas do arquivo, e envia pro e-mail do
-   banker correspondente.
+   e-mail com todas as contas do arquivo, e envia pro e-mail do banker
+   correspondente. Se hoje for o primeiro dia útil do mês, ele também
+   lê a aba "Vencimentos RF" e acrescenta essa seção no mesmo e-mail
+   (veja "Seção de vencimentos" abaixo).
 
 ## Formato do Excel do BTG
 
@@ -42,14 +43,16 @@ A planilha do BTG também traz outras abas (`Base BTG` com o patrimônio
 total, `Vencimentos RF` com o detalhe de renda fixa) que **não** são
 usadas por este boletim — ele lê só o saldo em conta corrente.
 
-## Boletim de vencimentos (vencimentos_mensal.py) — como funciona
+## Seção de vencimentos (dentro do e-mail de saldo)
 
-Lê a aba **"Vencimentos RF"** da mesma planilha do BTG e envia, uma vez
-por mês, a lista de ativos de renda fixa que vencem naquele mês —
-Cliente, Produto, Emissor, Indexador, Vencimento e Valor Líquido (curva
-cliente). Se nenhum ativo vencer no mês, o e-mail ainda é enviado, só
-que sem tabela (avisando que não há vencimento naquele mês) — em vez
-de ficar em silêncio, o que poderia parecer que a automação quebrou.
+No primeiro dia útil do mês, `main.py` lê a aba **"Vencimentos RF"** da
+mesma planilha do BTG e acrescenta, no mesmo e-mail do saldo, a lista
+de ativos de renda fixa que vencem naquele mês — Cliente, Produto,
+Emissor, Indexador, Vencimento e Valor Líquido (curva cliente). Se
+nenhum ativo vencer no mês, a seção aparece mesmo assim, só que sem
+tabela (avisando que não há vencimento naquele mês) — em vez de
+desaparecer silenciosamente, o que poderia parecer que a automação
+esqueceu dessa parte.
 
 Colunas lidas da aba (nomes toleram pequena variação, igual ao saldo):
 
@@ -67,48 +70,41 @@ A coluna `Ativo` (identificador interno, ex: `CDB-CDB1234AB1D`) existe
 na planilha mas não aparece no e-mail — não agrega informação pra
 quem lê, só polui a tabela.
 
-### Qual mês é enviado
+### Qual mês é mostrado
 
-O e-mail sai no **primeiro dia útil do mês** e mostra os vencimentos
-**daquele mesmo mês** (não do mês seguinte). O Agendador de Tarefas do
-Windows não tem um gatilho nativo de "primeiro dia útil" — a solução é
-agendar `vencimentos_mensal.bat` pra rodar **todo dia útil** (segunda a
-sexta) e deixar o próprio script decidir se hoje é o dia certo
-(`eh_primeiro_dia_util()` em `vencimentos_mensal.py`, considera só
-fins de semana — não considera feriados). Nos outros dias, ele sai sem
-enviar nada e sem erro — é esperado ver isso quase todo dia no
-`logs/tarefa_agendada_vencimentos.log`.
+A seção sai no **primeiro dia útil do mês** e mostra os vencimentos
+**daquele mesmo mês** (não do mês seguinte). `main.py` roda todo dia
+(gatilho "Diariamente" no Agendador de Tarefas — não tem nada de
+especial pro dia 1º), e decide sozinho, a cada execução, se hoje é o
+primeiro dia útil (`eh_primeiro_dia_util()` em `src/dias_uteis.py`,
+considera só fins de semana — não considera feriados). Se não for, o
+e-mail sai igual todo dia, só sem a seção de vencimentos.
 
-Pra testar com um mês específico (útil porque o mês atual pode não ter
-nenhum vencimento nos seus dados de teste):
+Pra testar a seção de vencimentos sem esperar o dia 1º:
+
+```
+python main.py --dry-run --incluir-vencimentos       # força a seção, mês atual
+python main.py --dry-run --mes 9 --ano 2026            # idem, simulando outro mês
+```
+
+(`--mes`/`--ano` já implicam `--incluir-vencimentos`.) Sem `--dry-run`,
+os mesmos argumentos disparam o envio real — útil pra ver como fica
+recebendo de verdade, não só abrindo o HTML.
+
+### vencimentos_mensal.py é só uma ferramenta de teste
+
+Esse script **não é chamado pela automação** — ele existe só pra
+pré-visualizar/testar a seção de vencimentos isolada, de um mês
+específico, sem montar o e-mail de saldo inteiro:
 
 ```
 python vencimentos_mensal.py --dry-run --mes 9 --ano 2026
 ```
 
-E pra forçar o envio real ignorando a checagem de dia útil (ex: você
-esqueceu de rodar no dia certo e quer mandar mesmo assim):
-
-```
-python vencimentos_mensal.py --forcar
-```
-
-### Testando e agendando
-
-Mesmo padrão do boletim de saldo:
-
-1. **`testar_vencimentos.bat`** (dry-run) — grava o HTML em
-   `saida_teste/vencimentos-<banker_id>.html`.
-2. **`vencimentos_mensal.bat` com `modo_teste.ativo: true`** — envio
-   real, redirecionado pro seu endereço de teste.
-
-No Agendador de Tarefas, a única diferença pro boletim de saldo é o
-gatilho: em vez de "Diariamente", use **"Semanalmente"**, repetir toda
-semana, marcando **segunda a sexta**. A Ação é a mesma ideia, só
-trocando o programa:
-- Programa/script: `C:\Automacoes\...\vencimentos_mensal.bat`
-- Adicionar argumentos: `silencioso`
-- Iniciar em: a pasta do projeto
+Se em algum momento você tiver uma tarefa agendada separada chamando
+`vencimentos_mensal.bat` (de uma versão anterior deste projeto), **remova
+essa tarefa** — hoje ela mandaria um e-mail de vencimentos duplicado, além
+do que já sai embutido no boletim de saldo do dia.
 
 ## Revisão manual antes de chegar ao banker (relay)
 
@@ -153,16 +149,18 @@ precisa mudar.
 
 ## Tabela como imagem (não editável)
 
-Em nenhum dos dois boletins a tabela vai como HTML no e-mail — vem como
-imagem PNG (`src/tabela_imagem.py` pro saldo, `src/tabela_vencimentos_imagem.py`
+Nenhuma tabela vai como HTML no e-mail — vem como imagem PNG
+(`src/tabela_imagem.py` pro saldo, `src/tabela_vencimentos_imagem.py`
 pros vencimentos, ambos usando `src/imagem_util.py`, gerada com Pillow),
 embutida no e-mail como anexo inline (`Content-ID`, referenciado via
 `cid:` no HTML — é o jeito que funciona de forma confiável no Outlook,
-diferente de imagem em base64 direto no HTML). O texto acima e abaixo
-da tabela é HTML normal, em tamanho 11 (`font-size:11pt`), montado por
-`src/email_base.py` (compartilhado pelos dois boletins — `email_builder.py`
-e `email_builder_vencimentos.py` só passam o texto e a imagem específicos
-de cada um).
+diferente de imagem em base64 direto no HTML). No e-mail combinado
+(saldo + vencimentos), as duas imagens vão anexadas ao mesmo e-mail,
+cada uma com seu próprio `cid`. O texto é HTML normal, em tamanho 11
+(`font-size:11pt`), montado por `src/email_base.py` — que aceita uma
+lista de "blocos" (texto + imagem opcional), um por seção; `email_builder.py`,
+`email_builder_vencimentos.py` e `email_builder_combinado.py` só montam
+os blocos específicos de cada caso.
 
 Isso é proposital: como imagem, o conteúdo não pode ser editado por
 quem recebe o e-mail antes de encaminhar — diferente de uma tabela em
@@ -256,7 +254,13 @@ Ou dê duplo clique em `atualizar.bat` / `testar.bat`.
    - Iniciar em: a pasta do projeto (ex:
      `C:\Automacoes\saldo-clientes-automacao`)
 5. Salve. A tarefa vai rodar sozinha, sem abrir janela nem esperar
-   clique.
+   clique — inclusive a seção de vencimentos, no primeiro dia útil do mês.
+
+**Só essa tarefa é necessária.** Se você criou uma tarefa separada
+`Vencimentos Mensal Horto` apontando pra `vencimentos_mensal.bat` (de
+uma versão anterior deste projeto), **exclua-a** — hoje ela geraria um
+e-mail de vencimentos duplicado, além do que já sai embutido no
+boletim de saldo.
 
 ## Formato de `config/bankers.csv`
 
@@ -282,7 +286,8 @@ auditoria de que os e-mails foram enviados.
   fornecer um mapeamento código → nome e ajustar `email_builder.py`.
 - Separar por múltiplos bankers (veja seção acima).
 - Anexar o saldo em Excel além do corpo do e-mail.
-- `eh_primeiro_dia_util()` (em `vencimentos_mensal.py`) considera só
-  fins de semana, não feriados — se o dia 1º útil "de calendário" cair
-  num feriado, o e-mail sai nesse feriado mesmo. Dá pra plugar uma
-  lista de feriados (ex: biblioteca `holidays`) se isso incomodar.
+- `eh_primeiro_dia_util()` (em `src/dias_uteis.py`) considera só fins
+  de semana, não feriados — se o dia 1º útil "de calendário" cair num
+  feriado, a seção de vencimentos sai nesse feriado mesmo. Dá pra
+  plugar uma lista de feriados (ex: biblioteca `holidays`) se isso
+  incomodar.

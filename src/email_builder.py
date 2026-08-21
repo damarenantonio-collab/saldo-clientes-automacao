@@ -9,6 +9,7 @@ não poder ser editada por quem recebe o e-mail antes de encaminhar.
 from datetime import date
 
 from .agrupador import GrupoBanker
+from .email_base import montar_bloco
 from .email_base import montar_corpo_html as _montar_corpo_html
 from .email_base import primeiro_nome
 
@@ -25,8 +26,12 @@ def montar_corpo_html(
     base64 no dry-run (pra abrir o HTML direto no navegador, sem e-mail
     de verdade por trás).
     """
-    paragrafos = [
-        f"Bom dia {primeiro_nome(grupo.banker_nome)}, tudo bem?",
-        "Segue abaixo, o saldo diário referente aos seus clientes no BTG.",
-    ]
-    return _montar_corpo_html(paragrafos, assinatura, imagem_src=imagem_src, aviso_teste=aviso_teste)
+    bloco = montar_bloco(
+        [
+            f"Bom dia {primeiro_nome(grupo.banker_nome)}, tudo bem?",
+            "Segue abaixo, o saldo diário referente aos seus clientes no BTG.",
+        ],
+        imagem_src=imagem_src,
+        imagem_largura=640,
+    )
+    return _montar_corpo_html([bloco], assinatura, aviso_teste=aviso_teste)
