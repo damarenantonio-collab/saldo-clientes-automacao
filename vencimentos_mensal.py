@@ -4,16 +4,14 @@ responsável (banker), a partir da planilha consolidada do escritório
 cada linha. Cada e-mail contém só os vencimentos dos clientes daquele
 responsável.
 
-Pensado pra rodar todo dia útil (o Agendador de Tarefas do Windows não
-tem um gatilho nativo de "primeiro dia útil do mês"): o script mesmo
-decide se hoje é esse dia e só envia nesse caso. Nos outros dias, sai
-sem fazer nada e sem erro.
+Envia sempre que rodado (sem checagem de dia) — a cadência mensal é
+controlada pelo próprio Agendador de Tarefas do Windows (gatilho
+"Mensalmente"), não pelo script. Veja o README, seção "Agendando".
 
 Uso:
     python vencimentos_mensal.py [--config config/settings.yaml]
     python vencimentos_mensal.py --dry-run
     python vencimentos_mensal.py --mes 10 --ano 2026   # simula outro mês (pra teste)
-    python vencimentos_mensal.py --forcar               # ignora a checagem de dia útil
 """
 
 import argparse
@@ -28,7 +26,6 @@ import pandas as pd
 import yaml
 
 from src import agrupador, bankers, email_builder_vencimentos, notify, tabela_vencimentos_imagem, vencimentos
-from src.dias_uteis import eh_primeiro_dia_util, primeiro_dia_util
 from src.meses import nome_mes
 
 ROOT = Path(__file__).resolve().parent
@@ -190,11 +187,6 @@ def main() -> None:
     )
     parser.add_argument("--mes", type=int, default=None, help="Mês a simular (1-12). Padrão: mês atual.")
     parser.add_argument("--ano", type=int, default=None, help="Ano a simular. Padrão: ano atual.")
-    parser.add_argument(
-        "--forcar",
-        action="store_true",
-        help="Ignora a checagem de 'hoje é o primeiro dia útil do mês' e envia mesmo assim.",
-    )
     args = parser.parse_args()
 
     config_path = (ROOT / args.config).resolve()
@@ -206,20 +198,10 @@ def main() -> None:
         sys.exit(1)
 
     hoje = date.today()
-    mes_simulado = args.mes is not None or args.ano is not None
     mes_ref = date(args.ano or hoje.year, args.mes or hoje.month, 1)
 
     settings = load_settings(config_path)
     logger = setup_logging(ROOT / "logs")
-
-    if not args.dry_run and not args.forcar and not mes_simulado and not eh_primeiro_dia_util(hoje):
-        logger.info(
-            "Hoje (%s) não é o primeiro dia útil do mês (seria %s) — nada enviado. "
-            "Use --forcar para enviar mesmo assim.",
-            hoje.isoformat(),
-            primeiro_dia_util(hoje.year, hoje.month).isoformat(),
-        )
-        return
 
     try:
         run(settings, logger, dry_run=args.dry_run, mes_ref=mes_ref)

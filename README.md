@@ -6,10 +6,10 @@ Dois e-mails automáticos, de fontes diferentes:
   do BTG (`Saldo_em_CC_BTG.xlsx`, aba "Saldo Diário"). Hoje só a
   Viviane tem esse boletim.
 - **`vencimentos_mensal.py`** — vencimentos de renda fixa do mês, uma
-  vez por mês (primeiro dia útil), a partir da planilha consolidada do
-  escritório inteiro (`Vencimentos_RF.xlsx`, aba "Export"). Um e-mail
-  por responsável (banker) — hoje Eduardo Rego, Viviane Brandão e
-  Antonio Carvalho.
+  vez por mês (dia 1, via gatilho mensal do Agendador de Tarefas), a
+  partir da planilha consolidada do escritório inteiro
+  (`Vencimentos_RF.xlsx`, aba "Export"). Um e-mail por responsável
+  (banker) — hoje Eduardo Rego, Viviane Brandão e Antonio Carvalho.
 
 São fontes de dados diferentes e independentes uma da outra — não é
 preciso que um cliente apareça nas duas pra funcionar.
@@ -96,27 +96,20 @@ crescer o time não exige mudar código, só adicionar uma linha em
 
 ### Qual mês é mostrado
 
-O e-mail sai no **primeiro dia útil do mês** e mostra os vencimentos
-**daquele mesmo mês** (não do mês seguinte). O Agendador de Tarefas do
-Windows não tem um gatilho nativo de "primeiro dia útil" — a solução é
-agendar `vencimentos_mensal.bat` pra rodar **todo dia útil** (segunda a
-sexta) e deixar o próprio script decidir se hoje é o dia certo
-(`eh_primeiro_dia_util()` em `src/dias_uteis.py`, considera só fins de
-semana — não considera feriados). Nos outros dias, ele sai sem enviar
-nada e sem erro — é esperado ver isso quase todo dia no
-`logs/tarefa_agendada_vencimentos.log`.
+O e-mail mostra os vencimentos **do mês em que é enviado** (não do mês
+seguinte) — ex: enviado em setembro, mostra vencimentos de setembro.
+O script não tem checagem de dia nenhuma — ele envia sempre que é
+chamado; quem decide a cadência é o gatilho **Mensalmente** do
+Agendador de Tarefas (veja "Agendando" abaixo). Isso pressupõe que a
+planilha `Vencimentos_RF.xlsx` esteja atualizada até lá — como ela só
+muda uma vez por mês (diferente do saldo, que é diário), basta
+atualizá-la perto do início do mês, antes do dia agendado.
 
 Pra testar com um mês específico (útil porque o mês atual pode não ter
 nenhum vencimento nos seus dados de teste):
 
 ```
 python vencimentos_mensal.py --dry-run --mes 9 --ano 2026
-```
-
-E pra forçar o envio real ignorando a checagem de dia útil:
-
-```
-python vencimentos_mensal.py --forcar
 ```
 
 ## Revisão manual antes de chegar ao banker (relay)
@@ -240,10 +233,9 @@ chegar ao banker" acima), só sem o banner de aviso.
 python main.py                                    # saldo: envio normal
 python main.py --dry-run                          # saldo: só grava HTML
 
-python vencimentos_mensal.py                       # vencimentos: envio normal (só no 1º dia útil)
+python vencimentos_mensal.py                       # vencimentos: envio normal (mês atual)
 python vencimentos_mensal.py --dry-run              # vencimentos: só grava HTML
 python vencimentos_mensal.py --dry-run --mes 9 --ano 2026   # simula outro mês
-python vencimentos_mensal.py --forcar                # ignora a checagem de dia útil
 ```
 
 Ou dê duplo clique em `atualizar.bat` / `testar.bat` /
@@ -263,16 +255,23 @@ São **duas tarefas separadas** — os boletins são independentes.
    - Adicionar argumentos: `silencioso`
    - Iniciar em: a pasta do projeto
 
-### Vencimentos (todo dia útil, só envia no 1º)
+### Vencimentos (mensal)
 
-1. Mesma planilha consolidada de vencimentos precisa estar atualizada
-   no caminho configurado em `vencimentos_xlsx`.
+1. A planilha consolidada de vencimentos (`vencimentos_xlsx`) só
+   precisa ser atualizada uma vez por mês — mas precisa estar
+   atualizada **antes** do horário agendado abaixo.
 2. Agendador de Tarefas → "Criar Tarefa Básica" → gatilho
-   **Semanalmente**, repetir toda semana, marcando **segunda a sexta**.
+   **Mensalmente** → marque o dia 1 (ou o dia do mês que preferir) →
+   escolha um horário depois que a planilha já estiver atualizada.
 3. Ação: "Iniciar um programa".
    - Programa/script: `C:\Automacoes\...\vencimentos_mensal.bat`
    - Adicionar argumentos: `silencioso`
    - Iniciar em: a pasta do projeto
+
+Se o dia escolhido cair num fim de semana ou feriado, o Agendador
+dispara mesmo assim (não existe ajuste automático pro próximo dia
+útil) — escolha um dia do mês que dificilmente vai colidir com isso,
+ou ajuste manualmente quando acontecer.
 
 Nas duas, na aba **Geral** das Propriedades da tarefa, use **"Executar
 somente quando o usuário estiver conectado"** (evita o erro de logon
@@ -306,7 +305,3 @@ tem histórico próprio ainda (veja "Próximos passos possíveis").
   o de vencimentos já faz (veja "Um único banker (por enquanto)" acima).
 - Anexar o saldo/vencimentos em Excel além do corpo do e-mail.
 - Histórico de envios pro boletim de vencimentos (hoje só o de saldo tem).
-- `eh_primeiro_dia_util()` (em `src/dias_uteis.py`) considera só fins
-  de semana, não feriados — se o dia 1º útil "de calendário" cair num
-  feriado, o e-mail sai nesse feriado mesmo. Dá pra plugar uma lista de
-  feriados (ex: biblioteca `holidays`) se isso incomodar.

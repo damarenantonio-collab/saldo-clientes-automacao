@@ -1,10 +1,10 @@
 @echo off
 REM Duplo clique pra rodar o boletim de vencimentos de renda fixa.
 REM
-REM Pensado pra ser agendado TODO DIA UTIL (nao so uma vez por mes) --
-REM o proprio vencimentos_mensal.py decide se hoje e o primeiro dia util
-REM do mes; nos outros dias ele sai sem enviar nada e sem erro. Veja o
-REM README, secao "Agendando (vencimentos)".
+REM Pensado pra ser agendado MENSALMENTE no Agendador de Tarefas do
+REM Windows (gatilho "Mensalmente", dia 1) -- o script envia sempre que
+REM rodado, sem checar o dia; quem controla a cadencia e o proprio
+REM Agendador. Veja o README, secao "Agendando".
 REM
 REM Ao agendar, chame com o argumento "silencioso":
 REM     vencimentos_mensal.bat silencioso
