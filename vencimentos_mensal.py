@@ -1,14 +1,19 @@
-"""Ferramenta manual pra testar/pré-visualizar o boletim de vencimentos
-de um mês específico, isoladamente.
+"""Envia por e-mail os vencimentos de renda fixa do mês — um e-mail por
+responsável (banker), a partir da planilha consolidada do escritório
+(`Vencimentos_RF.xlsx`, aba "Export"), que já traz o responsável de
+cada linha. Cada e-mail contém só os vencimentos dos clientes daquele
+responsável.
 
-No dia a dia, a automação NÃO chama este script — a seção de
-vencimentos sai embutida no e-mail de saldo (main.py), só no primeiro
-dia útil do mês. Este script serve pra conferir como aquela seção vai
-ficar sem precisar esperar o dia certo (--mes/--ano simulam o mês).
+Pensado pra rodar todo dia útil (o Agendador de Tarefas do Windows não
+tem um gatilho nativo de "primeiro dia útil do mês"): o script mesmo
+decide se hoje é esse dia e só envia nesse caso. Nos outros dias, sai
+sem fazer nada e sem erro.
 
 Uso:
-    python vencimentos_mensal.py --dry-run --mes 10 --ano 2026
-    python vencimentos_mensal.py --mes 10 --ano 2026   # envia de verdade (cai no seu relay)
+    python vencimentos_mensal.py [--config config/settings.yaml]
+    python vencimentos_mensal.py --dry-run
+    python vencimentos_mensal.py --mes 10 --ano 2026   # simula outro mês (pra teste)
+    python vencimentos_mensal.py --forcar               # ignora a checagem de dia útil
 """
 
 import argparse
@@ -19,6 +24,7 @@ import traceback
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
 import yaml
 
 from src import agrupador, bankers, email_builder_vencimentos, notify, tabela_vencimentos_imagem, vencimentos
@@ -46,16 +52,47 @@ def load_settings(config_path: Path) -> dict:
         return yaml.safe_load(f)
 
 
+def _montar_grupos(df_venc, mapa_bankers: dict, todos_banker_ids: set[str]):
+    """Um grupo por responsável conhecido (aparece na planilha, em
+    qualquer mês) — mesmo os que não têm vencimento nenhum no mês sendo
+    processado ainda recebem um e-mail (avisando disso), em vez de
+    ficar em silêncio. `pendentes` são responsáveis que aparecem na
+    planilha mas não têm e-mail cadastrado em bankers.csv.
+    """
+    if df_venc.empty:
+        grupos, pendentes = [], []
+    else:
+        grupos, pendentes = agrupador.agrupar_por_banker(df_venc, mapa_bankers)
+
+    ja_incluidos = {g.banker_id for g in grupos} | set(pendentes)
+    colunas_vazias = ["conta", "cliente", "produto", "vencimento", "valor_liquido", "banker_id"]
+
+    for banker_id in sorted(todos_banker_ids - ja_incluidos):
+        info = mapa_bankers.get(banker_id)
+        if info and info.get("email"):
+            grupos.append(
+                agrupador.GrupoBanker(
+                    banker_id=banker_id,
+                    banker_nome=info["nome"],
+                    email=info["email"],
+                    clientes=pd.DataFrame(columns=colunas_vazias),
+                )
+            )
+        else:
+            pendentes.append(banker_id)
+
+    return grupos, pendentes
+
+
 def run(settings: dict, logger: logging.Logger, dry_run: bool, mes_ref: date) -> None:
-    planilha_xlsx = (ROOT / settings["saldos_xlsx"]).resolve()
+    planilha_xlsx = (ROOT / settings["vencimentos_xlsx"]).resolve()
     bankers_csv = (ROOT / settings["bankers_csv"]).resolve()
-    banker_padrao = settings["banker_padrao"]
     sheet_name = settings.get("vencimentos_sheet", vencimentos.SHEET_PADRAO)
 
     if not planilha_xlsx.exists():
         raise RuntimeError(
-            f"{planilha_xlsx} não encontrado. Aponte saldos_xlsx em settings.yaml para "
-            f"o Excel baixado do BTG (é o mesmo arquivo do boletim de saldo)."
+            f"{planilha_xlsx} não encontrado. Aponte vencimentos_xlsx em settings.yaml para "
+            f"a planilha de vencimentos consolidada do escritório."
         )
     if not bankers_csv.exists():
         raise RuntimeError(
@@ -63,31 +100,24 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool, mes_ref: date) ->
             f"config/bankers.csv e preencha com seus bankers."
         )
 
-    df_venc = vencimentos.load_vencimentos(planilha_xlsx, banker_padrao, mes_ref, sheet_name=sheet_name)
+    todos_banker_ids = vencimentos.bankers_conhecidos(planilha_xlsx, sheet_name=sheet_name)
+    df_venc = vencimentos.load_vencimentos(planilha_xlsx, mes_ref, sheet_name=sheet_name)
     mapa_bankers = bankers.load_bankers(bankers_csv)
     log_sensivel = settings.get("log_dados_sensiveis", False)
 
     mes_ano = f"{nome_mes(mes_ref.month)}/{mes_ref.year}"
     logger.info("Carregado(s) %d vencimento(s) de renda fixa para %s.", len(df_venc), mes_ano)
 
-    if df_venc.empty:
-        grupos = [
-            agrupador.GrupoBanker(banker_id=bid, banker_nome=info["nome"], email=info["email"], clientes=df_venc)
-            for bid, info in mapa_bankers.items()
-            if info.get("email")
-        ]
-        pendentes = []
-    else:
-        grupos, pendentes = agrupador.agrupar_por_banker(df_venc, mapa_bankers)
+    grupos, pendentes = _montar_grupos(df_venc, mapa_bankers, todos_banker_ids)
 
     if pendentes:
         notify.send_alert(
             settings,
-            subject=f"[Vencimentos] {len(pendentes)} banker(s) sem e-mail cadastrado",
+            subject=f"[Vencimentos] {len(pendentes)} responsável(is) sem e-mail cadastrado",
             body=(
-                f"Os banker_id(s) abaixo aparecem nos vencimentos de {mes_ano} mas não têm "
-                f"e-mail cadastrado em bankers.csv — os clientes deles NÃO foram enviados "
-                f"nesta execução:\n\n" + "\n".join(f"- {b}" for b in pendentes)
+                f"Os banker_id(s) abaixo aparecem na planilha de vencimentos (responsável) mas "
+                f"não têm e-mail cadastrado em bankers.csv — os vencimentos deles NÃO foram "
+                f"enviados nesta execução:\n\n" + "\n".join(f"- {b}" for b in pendentes)
             ),
         )
 
@@ -184,8 +214,8 @@ def main() -> None:
 
     if not args.dry_run and not args.forcar and not mes_simulado and not eh_primeiro_dia_util(hoje):
         logger.info(
-            "Hoje (%s) não é o primeiro dia útil do mês (seria %s) — nada enviado por este script "
-            "(no dia a dia, main.py já cuida disso). Use --forcar para enviar mesmo assim.",
+            "Hoje (%s) não é o primeiro dia útil do mês (seria %s) — nada enviado. "
+            "Use --forcar para enviar mesmo assim.",
             hoje.isoformat(),
             primeiro_dia_util(hoje.year, hoje.month).isoformat(),
         )

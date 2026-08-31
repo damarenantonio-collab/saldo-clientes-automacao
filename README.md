@@ -1,31 +1,30 @@
 # Saldo Clientes — Automação
 
-Um único e-mail diário (`main.py`), a partir do Excel que o BTG
-disponibiliza (`Saldo_em_CC_BTG.xlsx`):
+Dois e-mails automáticos, de fontes diferentes:
 
-- **Todo dia**: saldo em conta corrente (aba "Saldo Diário").
-- **No primeiro dia útil do mês**: o mesmo e-mail também inclui os
-  vencimentos de renda fixa daquele mês (aba "Vencimentos RF") — não é
-  um segundo e-mail, é uma seção a mais no mesmo envio.
+- **`main.py`** — saldo em conta corrente, todo dia, a partir do Excel
+  do BTG (`Saldo_em_CC_BTG.xlsx`, aba "Saldo Diário"). Hoje só a
+  Viviane tem esse boletim.
+- **`vencimentos_mensal.py`** — vencimentos de renda fixa do mês, uma
+  vez por mês (primeiro dia útil), a partir da planilha consolidada do
+  escritório inteiro (`Vencimentos_RF.xlsx`, aba "Export"). Um e-mail
+  por responsável (banker) — hoje Eduardo Rego, Viviane Brandão e
+  Antonio Carvalho.
 
-Hoje há um único banker e todos os clientes são dele; a estrutura já
-está pronta para, no futuro, separar por banker sem reescrever nada
-(veja "Múltiplos bankers" abaixo).
+São fontes de dados diferentes e independentes uma da outra — não é
+preciso que um cliente apareça nas duas pra funcionar.
 
-## Boletim de saldo (main.py) — como funciona (resumo)
+## Boletim de saldo (main.py)
 
 1. Você baixa o Excel do BTG (manualmente, por enquanto) e salva sempre
    no mesmo caminho — ex: `C:/Saldo/Saldo_em_CC_BTG.xlsx`.
 2. `settings.yaml` aponta pra esse caminho (`saldos_xlsx`) e diz qual é
    o `banker_id` responsável por todo o arquivo (`banker_padrao`).
-3. `config/bankers.csv` tem o e-mail de cada banker (hoje, uma linha só).
-4. Ao rodar `python main.py`, o script lê a aba "Saldo Diário", monta um
+3. Ao rodar `python main.py`, o script lê a aba "Saldo Diário", monta um
    e-mail com todas as contas do arquivo, e envia pro e-mail do banker
-   correspondente. Se hoje for o primeiro dia útil do mês, ele também
-   lê a aba "Vencimentos RF" e acrescenta essa seção no mesmo e-mail
-   (veja "Seção de vencimentos" abaixo).
+   correspondente.
 
-## Formato do Excel do BTG
+### Formato do Excel do BTG
 
 O script lê a aba **"Saldo Diário"**, que tem estas colunas (o nome
 exato pode variar um pouco entre exportações — o script tolera isso):
@@ -39,72 +38,86 @@ exato pode variar um pouco entre exportações — o script tolera isso):
 Um mesmo código de cliente pode aparecer em mais de uma linha, se tiver
 mais de uma conta — cada linha vira uma linha na tabela do e-mail.
 
-A planilha do BTG também traz outras abas (`Base BTG` com o patrimônio
-total, `Vencimentos RF` com o detalhe de renda fixa) que **não** são
-usadas por este boletim — ele lê só o saldo em conta corrente.
+### Um único banker (por enquanto)
 
-## Seção de vencimentos (dentro do e-mail de saldo)
+O BTG não exporta quem é o responsável por cada cliente nessa
+planilha — então `banker_padrao`, em `settings.yaml`, é atribuído a
+toda linha do arquivo. Se um dia esse boletim precisar cobrir mais de
+um banker, o jeito é o mesmo já usado no boletim de vencimentos (veja
+"Como o banker é identificado" abaixo): crie (ou peça pro BTG) um
+export do saldo que já traga o responsável de cada conta, e adapte
+`src/saldos.py` pra derivar `banker_id` direto dessa coluna, em vez do
+`banker_padrao` fixo.
 
-No primeiro dia útil do mês, `main.py` lê a aba **"Vencimentos RF"** da
-mesma planilha do BTG e acrescenta, no mesmo e-mail do saldo, a lista
-de ativos de renda fixa que vencem naquele mês — Cliente, Produto,
-Emissor, Indexador, Vencimento e Valor Líquido (curva cliente). Se
-nenhum ativo vencer no mês, a seção aparece mesmo assim, só que sem
-tabela (avisando que não há vencimento naquele mês) — em vez de
-desaparecer silenciosamente, o que poderia parecer que a automação
-esqueceu dessa parte.
+## Boletim de vencimentos (vencimentos_mensal.py)
 
-Colunas lidas da aba (nomes toleram pequena variação, igual ao saldo):
+Lê a aba **"Export"** da planilha consolidada de vencimentos do
+escritório e envia, uma vez por mês, a lista de ativos de renda fixa
+que vencem naquele mês — um e-mail por responsável, cada um só com os
+vencimentos dos seus próprios clientes. Se um responsável não tiver
+nenhum vencimento no mês, ele recebe o e-mail mesmo assim, só sem
+tabela (avisando que não há vencimento naquele mês) — em vez de ficar
+em silêncio, o que poderia parecer que a automação esqueceu dele.
 
-| coluna                          | uso                                    |
-|----------------------------------|------------------------------------------|
-| `Conta BTG`                      | número da conta                          |
-| `Código do Cliente`               | código do cliente                        |
-| `Produto`                         | tipo do ativo (ex: `CDB`, `LCI`, `CRI`)  |
-| `Emissor`                         | nome do emissor do ativo                 |
-| `Indexador`                       | referência de rentabilidade (ex: `110% CDI`) |
-| `Vencimento`                      | data de vencimento — usada pra filtrar o mês |
-| `Valor Líquido - Curva Cliente`   | valor mostrado na tabela                 |
+### Formato da planilha de vencimentos
 
-A coluna `Ativo` (identificador interno, ex: `CDB-CDB1234AB1D`) existe
-na planilha mas não aparece no e-mail — não agrega informação pra
-quem lê, só polui a tabela.
+| coluna              | uso                                              |
+|----------------------|--------------------------------------------------|
+| `Conta BTG`           | número da conta (usado internamente, não aparece na tabela) |
+| `Nome do Cliente`     | nome/código do cliente                            |
+| `Descrição`           | tipo do ativo (ex: `CDB`, `LCI`, `TESOURO DIRETO - NTN-B`) |
+| `Valor Líquido`       | valor mostrado na tabela                          |
+| `Data Vencimento`     | data de vencimento — usada pra filtrar o mês      |
+| `Responsável`         | nome do banker — vira o `banker_id` (veja abaixo) |
+
+`Data Movimentação` existe na planilha mas não é usada.
+
+### Como o banker é identificado
+
+Diferente do saldo, essa planilha **já traz o responsável de cada
+linha** — não precisa de `banker_padrao` nem de mapeamento manual.
+`src/vencimentos.py` deriva o `banker_id` direto do nome em
+"Responsável", normalizando pra minúsculo/sem acento/com underscore:
+
+```
+"Eduardo Rego"    -> eduardo_rego
+"Viviane Brandão" -> viviane_brandao
+"Antonio Carvalho" -> antonio_carvalho
+```
+
+Esse `banker_id` precisa existir em `config/bankers.csv` com um
+e-mail cadastrado — se um responsável aparecer na planilha (em
+qualquer mês) sem estar em `bankers.csv`, ele entra na lista de
+pendências e o responsável pela automação é avisado por e-mail (veja
+`alerta_email`), mas nada é enviado pra esse banker até você
+cadastrá-lo. Isso vale pra quantos responsáveis a planilha tiver —
+crescer o time não exige mudar código, só adicionar uma linha em
+`bankers.csv`.
 
 ### Qual mês é mostrado
 
-A seção sai no **primeiro dia útil do mês** e mostra os vencimentos
-**daquele mesmo mês** (não do mês seguinte). `main.py` roda todo dia
-(gatilho "Diariamente" no Agendador de Tarefas — não tem nada de
-especial pro dia 1º), e decide sozinho, a cada execução, se hoje é o
-primeiro dia útil (`eh_primeiro_dia_util()` em `src/dias_uteis.py`,
-considera só fins de semana — não considera feriados). Se não for, o
-e-mail sai igual todo dia, só sem a seção de vencimentos.
+O e-mail sai no **primeiro dia útil do mês** e mostra os vencimentos
+**daquele mesmo mês** (não do mês seguinte). O Agendador de Tarefas do
+Windows não tem um gatilho nativo de "primeiro dia útil" — a solução é
+agendar `vencimentos_mensal.bat` pra rodar **todo dia útil** (segunda a
+sexta) e deixar o próprio script decidir se hoje é o dia certo
+(`eh_primeiro_dia_util()` em `src/dias_uteis.py`, considera só fins de
+semana — não considera feriados). Nos outros dias, ele sai sem enviar
+nada e sem erro — é esperado ver isso quase todo dia no
+`logs/tarefa_agendada_vencimentos.log`.
 
-Pra testar a seção de vencimentos sem esperar o dia 1º:
-
-```
-python main.py --dry-run --incluir-vencimentos       # força a seção, mês atual
-python main.py --dry-run --mes 9 --ano 2026            # idem, simulando outro mês
-```
-
-(`--mes`/`--ano` já implicam `--incluir-vencimentos`.) Sem `--dry-run`,
-os mesmos argumentos disparam o envio real — útil pra ver como fica
-recebendo de verdade, não só abrindo o HTML.
-
-### vencimentos_mensal.py é só uma ferramenta de teste
-
-Esse script **não é chamado pela automação** — ele existe só pra
-pré-visualizar/testar a seção de vencimentos isolada, de um mês
-específico, sem montar o e-mail de saldo inteiro:
+Pra testar com um mês específico (útil porque o mês atual pode não ter
+nenhum vencimento nos seus dados de teste):
 
 ```
 python vencimentos_mensal.py --dry-run --mes 9 --ano 2026
 ```
 
-Se em algum momento você tiver uma tarefa agendada separada chamando
-`vencimentos_mensal.bat` (de uma versão anterior deste projeto), **remova
-essa tarefa** — hoje ela mandaria um e-mail de vencimentos duplicado, além
-do que já sai embutido no boletim de saldo do dia.
+E pra forçar o envio real ignorando a checagem de dia útil:
+
+```
+python vencimentos_mensal.py --forcar
+```
 
 ## Revisão manual antes de chegar ao banker (relay)
 
@@ -112,7 +125,8 @@ Por definição do family office, o e-mail não vai direto para o banker
 final — ele passa primeiro por uma caixa de revisão (hoje, o e-mail
 profissional de quem administra a automação), e essa pessoa encaminha
 manualmente para o banker depois. Isso é permanente, não uma etapa de
-teste a ser removida depois.
+teste a ser removida depois. Vale pros dois boletins, e pra todos os
+bankers — inclusive Eduardo Rego, não só a Viviane.
 
 Isso é implementado sem nenhuma lógica especial: o campo `email` em
 `bankers.csv` é o endereço de **entrega** da automação, que pode ser
@@ -124,28 +138,19 @@ pra caixa de outra pessoa; não é um erro de configuração.
 ```csv
 banker_id,banker_nome,email
 vbrandao,Viviane,acarvalho@hortocapital.com.br
+eduardo_rego,Eduardo Rego,acarvalho@hortocapital.com.br
+viviane_brandao,Viviane Brandão,acarvalho@hortocapital.com.br
+antonio_carvalho,Antonio Carvalho,acarvalho@hortocapital.com.br
 ```
 
+(repare que `vbrandao` — usado pelo boletim de saldo — e
+`viviane_brandao` — derivado da planilha de vencimentos — são a mesma
+pessoa, com `banker_id`s diferentes porque vêm de fontes de dados
+diferentes; isso é normal, não precisa unificar.)
+
 Se um dia quiser que a automação envie direto pro banker (pulando a
-revisão manual), é só trocar esse `email` pelo e-mail do próprio
-banker — mas isso é opcional, não o destino "final" do projeto.
-
-## Múltiplos bankers (quando precisar)
-
-Hoje `banker_padrao` em `settings.yaml` é atribuído a toda linha do
-Excel, porque só existe um banker. Quando houver mais de um:
-
-1. Crie `config/clientes_banker.csv` com duas colunas: `codigo_cliente`,
-   `banker_id`.
-2. Em `src/saldos.py`, troque a linha `df["banker_id"] = banker_padrao`
-   por um `merge` desse DataFrame com o mapeamento código → banker
-   (usando `cliente` como chave), e trate cliente sem mapeamento como
-   pendência.
-
-O resto do fluxo (agrupamento por banker em `src/agrupador.py`, envio
-individual em `src/notify.py`, checagem de que ninguém recebe dado de
-outro banker) já funciona para qualquer quantidade de bankers — não
-precisa mudar.
+revisão manual), é só trocar o `email` daquela linha pelo e-mail do
+próprio banker — mas isso é opcional, não o destino "final" do projeto.
 
 ## Tabela como imagem (não editável)
 
@@ -154,13 +159,11 @@ Nenhuma tabela vai como HTML no e-mail — vem como imagem PNG
 pros vencimentos, ambos usando `src/imagem_util.py`, gerada com Pillow),
 embutida no e-mail como anexo inline (`Content-ID`, referenciado via
 `cid:` no HTML — é o jeito que funciona de forma confiável no Outlook,
-diferente de imagem em base64 direto no HTML). No e-mail combinado
-(saldo + vencimentos), as duas imagens vão anexadas ao mesmo e-mail,
-cada uma com seu próprio `cid`. O texto é HTML normal, em tamanho 11
-(`font-size:11pt`), montado por `src/email_base.py` — que aceita uma
-lista de "blocos" (texto + imagem opcional), um por seção; `email_builder.py`,
-`email_builder_vencimentos.py` e `email_builder_combinado.py` só montam
-os blocos específicos de cada caso.
+diferente de imagem em base64 direto no HTML). O texto é HTML normal,
+em tamanho 11 (`font-size:11pt`), montado por `src/email_base.py`
+(compartilhado pelos dois boletins — `email_builder.py` e
+`email_builder_vencimentos.py` só passam o texto e a imagem
+específicos de cada um).
 
 Isso é proposital: como imagem, o conteúdo não pode ser editado por
 quem recebe o e-mail antes de encaminhar — diferente de uma tabela em
@@ -201,29 +204,30 @@ Vale para os dois boletins — ambos usam o mesmo `src/agrupador.py`.
    "Add python.exe to PATH" no instalador), se ainda não tiver.
 2. Dê duplo clique em **`instalar.bat`**.
 3. Copie `config/bankers.example.csv` → `config/bankers.csv` e preencha
-   com o(s) banker(s) reais (`banker_id`, nome, e-mail).
+   com os bankers reais (`banker_id`, nome, e-mail) — veja "Como o
+   banker é identificado" acima pra saber o `banker_id` de cada
+   responsável do boletim de vencimentos.
 4. Copie `config/settings.example.yaml` → `config/settings.yaml` e
    ajuste:
-   - `saldos_xlsx`: caminho completo de onde você salva o Excel baixado
-     do BTG;
-   - `banker_padrao`: o `banker_id` (precisa ser um dos cadastrados em
-     `bankers.csv`);
+   - `saldos_xlsx`: caminho de onde você salva o Excel de saldo do BTG;
+   - `banker_padrao`: o `banker_id` do boletim de saldo;
+   - `vencimentos_xlsx`: caminho da planilha consolidada de vencimentos;
    - `email:` com os dados de SMTP da empresa — **deixe
      `modo_teste.ativo: true`** enquanto estiver testando (veja abaixo).
 
 ## Testando antes de ativar de verdade
 
-Existem dois passos de teste, em ordem, antes de mandar e-mail real pro
-banker:
+Mesmo padrão pros dois boletins — dois passos, em ordem:
 
-1. **`testar.bat`** (dry-run) — não usa SMTP nenhum; grava o HTML em
-   `saida_teste/<banker_id>.html` pra você abrir no navegador e conferir
-   o conteúdo.
-2. **`atualizar.bat` com `modo_teste.ativo: true`** — usa o SMTP de
-   verdade, mas redireciona todos os e-mails para o endereço em
-   `modo_teste.enviar_para`, com um aviso no topo do e-mail dizendo pra
-   quem ele seria enviado de verdade. Isso valida a configuração de
-   SMTP de ponta a ponta sem expor dado de cliente pros bankers reais.
+1. **`testar.bat`** / **`testar_vencimentos.bat`** (dry-run) — não usam
+   SMTP nenhum; gravam o HTML em `saida_teste/` pra você abrir no
+   navegador e conferir o conteúdo.
+2. **`atualizar.bat`** / **`vencimentos_mensal.bat`** com
+   `modo_teste.ativo: true` — usam o SMTP de verdade, mas redirecionam
+   todos os e-mails para o endereço em `modo_teste.enviar_para`, com um
+   aviso no topo do e-mail dizendo pra quem ele seria enviado de
+   verdade. Isso valida a configuração de SMTP de ponta a ponta sem
+   expor dado de cliente pros bankers reais.
 
 Só depois de conferir os dois, mude `modo_teste.ativo` para `false` em
 `settings.yaml` para começar o envio real — que continua indo pro
@@ -233,61 +237,76 @@ chegar ao banker" acima), só sem o banner de aviso.
 ## Rodando manualmente
 
 ```
-python main.py              # envio normal (real ou modo teste, conforme settings.yaml)
-python main.py --dry-run    # não envia nada, só grava HTML em saida_teste/
+python main.py                                    # saldo: envio normal
+python main.py --dry-run                          # saldo: só grava HTML
+
+python vencimentos_mensal.py                       # vencimentos: envio normal (só no 1º dia útil)
+python vencimentos_mensal.py --dry-run              # vencimentos: só grava HTML
+python vencimentos_mensal.py --dry-run --mes 9 --ano 2026   # simula outro mês
+python vencimentos_mensal.py --forcar                # ignora a checagem de dia útil
 ```
 
-Ou dê duplo clique em `atualizar.bat` / `testar.bat`.
+Ou dê duplo clique em `atualizar.bat` / `testar.bat` /
+`vencimentos_mensal.bat` / `testar_vencimentos.bat`.
 
 ## Agendando a execução automática (Windows Task Scheduler)
 
-1. Baixe o Excel do BTG e salve no caminho configurado em `saldos_xlsx`
-   **antes** do horário agendado (isso ainda é manual — veja "Próximos
-   passos possíveis" sobre automatizar o download).
-2. Abra o **Agendador de Tarefas** do Windows → "Criar Tarefa Básica".
-3. Defina o gatilho (ex: todo dia, num horário depois que você já tiver
-   salvo o Excel do dia).
-4. Ação: "Iniciar um programa".
-   - Programa/script: caminho completo até `atualizar.bat`
-     (ex: `C:\Automacoes\saldo-clientes-automacao\atualizar.bat`)
-   - Adicionar argumentos: `silencioso`
-   - Iniciar em: a pasta do projeto (ex:
-     `C:\Automacoes\saldo-clientes-automacao`)
-5. Salve. A tarefa vai rodar sozinha, sem abrir janela nem esperar
-   clique — inclusive a seção de vencimentos, no primeiro dia útil do mês.
+São **duas tarefas separadas** — os boletins são independentes.
 
-**Só essa tarefa é necessária.** Se você criou uma tarefa separada
-`Vencimentos Mensal Horto` apontando pra `vencimentos_mensal.bat` (de
-uma versão anterior deste projeto), **exclua-a** — hoje ela geraria um
-e-mail de vencimentos duplicado, além do que já sai embutido no
-boletim de saldo.
+### Saldo (todo dia)
+
+1. Baixe o Excel do BTG e salve no caminho configurado em `saldos_xlsx`
+   **antes** do horário agendado (isso ainda é manual).
+2. Agendador de Tarefas → "Criar Tarefa Básica" → gatilho **Diariamente**.
+3. Ação: "Iniciar um programa".
+   - Programa/script: `C:\Automacoes\...\atualizar.bat`
+   - Adicionar argumentos: `silencioso`
+   - Iniciar em: a pasta do projeto
+
+### Vencimentos (todo dia útil, só envia no 1º)
+
+1. Mesma planilha consolidada de vencimentos precisa estar atualizada
+   no caminho configurado em `vencimentos_xlsx`.
+2. Agendador de Tarefas → "Criar Tarefa Básica" → gatilho
+   **Semanalmente**, repetir toda semana, marcando **segunda a sexta**.
+3. Ação: "Iniciar um programa".
+   - Programa/script: `C:\Automacoes\...\vencimentos_mensal.bat`
+   - Adicionar argumentos: `silencioso`
+   - Iniciar em: a pasta do projeto
+
+Nas duas, na aba **Geral** das Propriedades da tarefa, use **"Executar
+somente quando o usuário estiver conectado"** (evita o erro de logon
+0x8007**0569** comum com contas de domínio corporativas rodando "estando
+conectado ou não").
 
 ## Formato de `config/bankers.csv`
 
 | coluna         | descrição                          |
 |----------------|--------------------------------------|
-| `banker_id`    | identificador do banker (usado em `banker_padrao`, e futuramente em `clientes_banker.csv`) |
-| `banker_nome`  | nome usado na saudação do e-mail ("Bom dia \<nome\>") — sempre o do banker de verdade |
+| `banker_id`    | identificador do banker — pro saldo é o valor de `banker_padrao`; pros vencimentos é derivado do nome em "Responsável" (veja "Como o banker é identificado") |
+| `banker_nome`  | nome usado na saudação do e-mail ("Bom dia \<primeiro nome\>") — sempre o do banker de verdade |
 | `email`        | endereço de **entrega** — pode ser o do próprio banker, ou o de uma caixa de revisão que encaminha manualmente depois (veja "Revisão manual antes de chegar ao banker") |
 
 ## Histórico
 
-Com `manter_historico: true` (padrão), a cada envio real é gravada uma
-linha por banker em `historico/envios_diarios.csv` com data, banker,
-quantidade de contas e saldo total — **sem** detalhe por cliente — para
-auditoria de que os e-mails foram enviados.
+Com `manter_historico: true` (padrão), a cada envio real do **boletim
+de saldo** é gravada uma linha por banker em
+`historico/envios_diarios.csv` com data, banker, quantidade de contas e
+saldo total — **sem** detalhe por cliente. O boletim de vencimentos não
+tem histórico próprio ainda (veja "Próximos passos possíveis").
 
 ## Próximos passos possíveis
 
-- Automatizar o download do Excel do BTG (se o BTG tiver uma API ou
-  portal com exportação agendável), eliminando o passo manual antes do
-  Agendador de Tarefas rodar.
-- Trocar o código do cliente por um nome legível no e-mail — é só
-  fornecer um mapeamento código → nome e ajustar `email_builder.py`.
-- Separar por múltiplos bankers (veja seção acima).
-- Anexar o saldo em Excel além do corpo do e-mail.
+- Automatizar o download dos dois arquivos (saldo e vencimentos), se o
+  BTG/sistema interno tiver exportação agendável, eliminando o passo
+  manual antes do Agendador de Tarefas rodar.
+- Trocar o código do cliente por um nome legível no boletim de saldo —
+  é só fornecer um mapeamento código → nome e ajustar `email_builder.py`.
+- Estender o boletim de saldo pra múltiplos bankers, do mesmo jeito que
+  o de vencimentos já faz (veja "Um único banker (por enquanto)" acima).
+- Anexar o saldo/vencimentos em Excel além do corpo do e-mail.
+- Histórico de envios pro boletim de vencimentos (hoje só o de saldo tem).
 - `eh_primeiro_dia_util()` (em `src/dias_uteis.py`) considera só fins
   de semana, não feriados — se o dia 1º útil "de calendário" cair num
-  feriado, a seção de vencimentos sai nesse feriado mesmo. Dá pra
-  plugar uma lista de feriados (ex: biblioteca `holidays`) se isso
-  incomodar.
+  feriado, o e-mail sai nesse feriado mesmo. Dá pra plugar uma lista de
+  feriados (ex: biblioteca `holidays`) se isso incomodar.

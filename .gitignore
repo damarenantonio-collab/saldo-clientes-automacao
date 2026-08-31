@@ -1,5 +1,6 @@
 # Configurações com dados reais (clientes, bankers, credenciais SMTP) — nunca versionar
 config/saldos.xlsx
+config/vencimentos.xlsx
 config/bankers.csv
 config/settings.yaml
 
@@ -7,6 +8,7 @@ config/settings.yaml
 *.xlsx
 *.xls
 !config/saldos.example.xlsx
+!config/vencimentos.example.xlsx
 
 # Saída de teste (dry-run) — pode conter dado de cliente em HTML local
 saida_teste/*.html

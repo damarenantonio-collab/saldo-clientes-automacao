@@ -1,7 +1,5 @@
 """Monta o corpo HTML do e-mail mensal de vencimentos de renda fixa
-para um único banker (usado só quando `vencimentos_mensal.py` roda
-como ferramenta manual de teste/preview — no dia a dia, essa seção sai
-embutida no e-mail de saldo, veja src/email_builder_combinado.py).
+para um único banker.
 """
 
 from datetime import date
@@ -12,7 +10,7 @@ from .email_base import montar_corpo_html as _montar_corpo_html
 from .email_base import primeiro_nome
 from .meses import nome_mes
 
-LARGURA_IMAGEM = 800
+LARGURA_IMAGEM = 640
 
 
 def texto_vencimentos(banker_nome: str, mes_ref: date, tem_vencimento: bool) -> list[str]:

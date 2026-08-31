@@ -24,28 +24,25 @@ bankers_csv: "config/bankers.csv"
 # Nome usado na assinatura do e-mail ("Att,\n<assinatura>").
 assinatura: "Antonio Carvalho"
 
-# Assunto do e-mail nos dias normais. {banker} e {data} são substituídos
+# Assunto do e-mail de saldo. {banker} e {data} são substituídos
 # automaticamente (banker fica disponível mesmo não estando no template
 # padrão, caso você queira reintroduzir no futuro).
 assunto_template: "Saldo em Conta - {data}"
 
-# Assunto do e-mail no primeiro dia útil do mês, quando a seção de
-# vencimentos entra junto (veja "vencimentos_sheet" abaixo). {data} é
-# substituído automaticamente.
-assunto_template_combinado: "Saldo em Conta e Vencimentos do Mês - {data}"
+# --- Boletim de vencimentos (vencimentos_mensal.py) ---
+# Caminho da planilha CONSOLIDADA de vencimentos de renda fixa do
+# escritório inteiro (arquivo separado do saldo — ex: "Vencimentos_RF.xlsx").
+# Diferente do saldo, essa planilha já traz o responsável (banker) de
+# cada linha, então dá pra ter quantos bankers precisar sem configuração
+# extra — o banker_id de cada um é derivado do nome em "Responsável"
+# (ex: "Eduardo Rego" -> "eduardo_rego") e precisa existir em bankers.csv.
+vencimentos_xlsx: "C:/Saldo/Vencimentos_RF.xlsx"
 
-# --- Vencimentos de renda fixa ---
-# Aba do Excel do BTG (mesmo arquivo do saldo, veja saldos_xlsx acima)
-# com os vencimentos de renda fixa. No primeiro dia útil do mês, main.py
-# lê essa aba e inclui os vencimentos do mês no mesmo e-mail do saldo —
-# não é um envio separado. vencimentos_mensal.py só existe como
-# ferramenta manual pra testar/pré-visualizar essa seção sem esperar o
-# dia certo (veja o README).
-vencimentos_sheet: "Vencimentos RF"
+# Aba da planilha de vencimentos.
+vencimentos_sheet: "Export"
 
-# Assunto usado só quando vencimentos_mensal.py roda manualmente (fora
-# do fluxo automático). {mes_ano} é substituído automaticamente (ex:
-# "Agosto/2026").
+# Assunto do e-mail mensal de vencimentos. {mes_ano} é substituído
+# automaticamente (ex: "Agosto/2026").
 assunto_template_vencimentos: "Vencimentos do Mês - {mes_ano}"
 
 # --- Envio de e-mail (SMTP) ---
