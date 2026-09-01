@@ -39,6 +39,31 @@ vencimentos_sheet: "Export"
 # automaticamente (ex: "Agosto/2026").
 assunto_template_vencimentos: "Vencimentos do Mês - {mes_ano}"
 
+# --- Boletim de vencimento de cartão de crédito (cartoes_vencimento.py) ---
+# Caminho da planilha de CONTROLE de vencimento de fatura de cartão —
+# diferente das outras duas, essa é mantida manualmente por você (não
+# vem do BTG). Veja config/cartoes.example.xlsx pro formato esperado.
+cartoes_xlsx: "C:/Saldo/lembretes_cartoes.xlsx"
+
+# Aba da planilha de cartões.
+cartoes_sheet: "Clientes"
+
+# Essa planilha não tem coluna de "Responsável" — hoje todos os
+# clientes cadastrados nela são de um único banker. Coloque aqui o
+# banker_id (precisa existir em bankers.csv) que deve receber os
+# avisos. Se um dia a planilha passar a ter mais de um banker, essa
+# automação precisará ser revista.
+cartoes_banker_id: "viviane_brandao"
+
+# Quantos dias antes do vencimento (e no próprio dia) o banker é
+# avisado. Só é enviado e-mail quando há algum cliente dentro dessa
+# janela — nos outros dias, nada é enviado.
+cartoes_dias_aviso: 1
+
+# Assunto do e-mail de aviso de cartão. {data} é substituído
+# automaticamente pela data de hoje.
+assunto_template_cartoes: "Vencimento de Fatura de Cartão - {data}"
+
 # --- Envio de e-mail (SMTP) ---
 email:
   # Servidor SMTP corporativo. Exemplo abaixo é o do Gmail com "senha de

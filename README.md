@@ -1,18 +1,23 @@
 # Saldo Clientes — Automação
 
-Dois e-mails automáticos, a partir de duas planilhas consolidadas do
-escritório inteiro (fontes diferentes, independentes uma da outra):
+Três e-mails automáticos, cada um a partir da sua própria planilha,
+independentes entre si:
 
 - **`main.py`** — saldo em conta corrente, todo dia, a partir de
   `Saldo_em_CC_BTG.xlsx`.
 - **`vencimentos_mensal.py`** — vencimentos de renda fixa do mês, uma
   vez por mês (dia 1, via gatilho mensal do Agendador de Tarefas), a
   partir de `Vencimentos_RF.xlsx`.
+- **`cartoes_vencimento.py`** — aviso de vencimento de fatura de
+  cartão de crédito, todo dia, a partir de uma planilha de controle
+  mantida manualmente (`lembretes_cartoes.xlsx`) — só envia e-mail
+  quando há algum vencimento próximo.
 
-Os dois são multi-banker: cada planilha já traz o responsável de cada
-linha (coluna "Responsável"), então cada boletim manda um e-mail por
-banker, cada um só com os seus próprios clientes — hoje Eduardo Rego,
-Viviane Brandão e Antonio Carvalho.
+Os dois primeiros são multi-banker: a planilha já traz o responsável
+de cada linha (coluna "Responsável"), então o boletim manda um e-mail
+por banker, cada um só com os seus próprios clientes — hoje Eduardo
+Rego, Viviane Brandão e Antonio Carvalho. O de cartões é diferente —
+veja a seção própria dele abaixo.
 
 ## Como o banker é identificado
 
@@ -95,6 +100,53 @@ nenhum vencimento nos seus dados de teste):
 ```
 python vencimentos_mensal.py --dry-run --mes 9 --ano 2026
 ```
+
+## Boletim de vencimento de cartão de crédito (cartoes_vencimento.py)
+
+Diferente dos outros dois, essa planilha (`lembretes_cartoes.xlsx`) não
+vem do BTG — é um controle mantido manualmente por você, com uma linha
+por cartão de cada cliente. O script lê essa planilha todo dia e só
+manda e-mail quando há algum cliente com fatura vencendo dentro da
+janela de aviso (`cartoes_dias_aviso`, padrão 1 dia — ou seja, avisa no
+dia anterior e no próprio dia do vencimento). Nos outros dias, não
+envia nada.
+
+### Formato da planilha de cartões
+
+A planilha tem linhas de instrução no topo (ignoradas automaticamente
+— o script procura a linha com "Cliente" na primeira coluna) e depois:
+
+| coluna                | uso                                          |
+|------------------------|-----------------------------------------------|
+| `Cliente`              | nome/código do cliente                        |
+| `Cartão / Descrição`   | banco emissor ou descrição do cartão          |
+| `Dia do Venc.`         | dia do mês (1–31) em que a fatura vence, todo mês |
+| `Ativo`                | `Sim`/`Não` — só linhas `Sim` geram aviso     |
+
+Colunas extras da sua planilha original (`Observações`, `Próximo
+Vencimento`, `Dias até Vencer`, `Status`) não são usadas — o script
+recalcula a data de vencimento e os dias restantes ele mesmo, a partir
+só do `Dia do Venc.`, em vez de depender de fórmulas do Excel.
+
+### Só um banker (por enquanto)
+
+Essa planilha não tem coluna de "Responsável" como as outras duas —
+hoje todos os clientes cadastrados nela são de um único banker,
+configurado em `cartoes_banker_id` no `settings.yaml` (precisa ser um
+`banker_id` que exista em `bankers.csv`). Se um dia precisar atender
+mais de um banker nesse boletim, essa automação vai precisar ser
+revista pra ganhar uma coluna de responsável, no mesmo padrão do
+saldo/vencimentos.
+
+### Limitação: dias úteis
+
+Essa tarefa está agendada só de dias úteis (segunda a sexta), igual ao
+boletim de saldo. Isso significa que um vencimento que caia num sábado
+ou domingo pode não ter aviso a tempo — o próximo aviso só sai na
+sexta-feira anterior (se a janela de aviso alcançar) ou não sai
+nenhum, dependendo de quantos dias faltam quando a tarefa roda de
+novo, na segunda. Se isso for um problema na prática, dá pra trocar o
+gatilho da tarefa pra rodar todo dia (inclusive fim de semana).
 
 ## Revisão manual antes de chegar ao banker (relay)
 
@@ -181,24 +233,31 @@ Vale para os dois boletins — ambos usam o mesmo `src/agrupador.py`.
    ajuste:
    - `saldos_xlsx`: caminho da planilha consolidada de saldo;
    - `vencimentos_xlsx`: caminho da planilha consolidada de vencimentos;
+   - `cartoes_xlsx` e `cartoes_banker_id`: caminho da planilha de
+     controle de cartões e o banker que deve receber os avisos;
    - `email:` com os dados de SMTP da empresa — **deixe
      `modo_teste.ativo: true`** enquanto estiver testando (veja abaixo).
 
 ## Testando antes de ativar de verdade
 
-Mesmo padrão pros dois boletins — dois passos, em ordem:
+Mesmo padrão pros três boletins — dois passos, em ordem:
 
-1. **`testar.bat`** / **`testar_vencimentos.bat`** (dry-run) — não usam
-   SMTP nenhum; gravam o HTML em `saida_teste/` pra você abrir no
-   navegador e conferir o conteúdo.
-2. **`atualizar.bat`** / **`vencimentos_mensal.bat`** com
-   `modo_teste.ativo: true` — usam o SMTP de verdade, mas redirecionam
-   todos os e-mails para o endereço em `modo_teste.enviar_para`, com um
-   aviso no topo do e-mail dizendo pra quem ele seria enviado de
-   verdade. Isso valida a configuração de SMTP de ponta a ponta sem
-   expor dado de cliente pros bankers reais.
+1. **`testar.bat`** / **`testar_vencimentos.bat`** / **`testar_cartoes.bat`**
+   (dry-run) — não usam SMTP nenhum; gravam o HTML em `saida_teste/`
+   pra você abrir no navegador e conferir o conteúdo. No de cartões,
+   se não aparecer nenhum arquivo `cartoes-*.html`, é porque não há
+   nenhum vencimento dentro da janela de aviso na data de hoje — não é
+   erro (use `--dry-run --data AAAA-MM-DD` pra simular uma data com
+   vencimento).
+2. **`atualizar.bat`** / **`vencimentos_mensal.bat`** / **`cartoes_vencimento.bat`**
+   com `modo_teste.ativo: true` — usam o SMTP de verdade, mas
+   redirecionam todos os e-mails para o endereço em
+   `modo_teste.enviar_para`, com um aviso no topo do e-mail dizendo
+   pra quem ele seria enviado de verdade. Isso valida a configuração
+   de SMTP de ponta a ponta sem expor dado de cliente pros bankers
+   reais.
 
-Só depois de conferir os dois, mude `modo_teste.ativo` para `false` em
+Só depois de conferir os três, mude `modo_teste.ativo` para `false` em
 `settings.yaml` para começar o envio real — que continua indo pro
 endereço configurado em `bankers.csv` (veja "Revisão manual antes de
 chegar ao banker" acima), só sem o banner de aviso.
@@ -212,16 +271,21 @@ python main.py --dry-run                          # saldo: só grava HTML
 python vencimentos_mensal.py                       # vencimentos: envio normal (mês atual)
 python vencimentos_mensal.py --dry-run              # vencimentos: só grava HTML
 python vencimentos_mensal.py --dry-run --mes 9 --ano 2026   # simula outro mês
+
+python cartoes_vencimento.py                       # cartões: envio normal (data de hoje)
+python cartoes_vencimento.py --dry-run              # cartões: só grava HTML
+python cartoes_vencimento.py --dry-run --data 2026-09-14   # simula outra data
 ```
 
 Ou dê duplo clique em `atualizar.bat` / `testar.bat` /
-`vencimentos_mensal.bat` / `testar_vencimentos.bat`.
+`vencimentos_mensal.bat` / `testar_vencimentos.bat` /
+`cartoes_vencimento.bat` / `testar_cartoes.bat`.
 
 ## Agendando a execução automática (Windows Task Scheduler)
 
-São **duas tarefas separadas** — os boletins são independentes.
+São **três tarefas separadas** — os boletins são independentes.
 
-### Saldo (todo dia)
+### Saldo (dias úteis)
 
 1. Baixe/atualize a planilha de saldo e salve no caminho configurado em
    `saldos_xlsx` **antes** do horário agendado (isso ainda é manual).
@@ -251,7 +315,25 @@ dispara mesmo assim (não existe ajuste automático pro próximo dia
 útil) — escolha um dia do mês que dificilmente vai colidir com isso,
 ou ajuste manualmente quando acontecer.
 
-Nas duas, na aba **Geral** das Propriedades da tarefa, use **"Executar
+### Cartão de crédito (dias úteis)
+
+1. Mantenha a planilha de `cartoes_xlsx` atualizada — como é um
+   controle manual (não vem do BTG), basta editar direto quando um
+   cliente entrar/sair ou mudar o dia de vencimento.
+2. Agendador de Tarefas → "Criar Tarefa Básica" → gatilho **Semanal**,
+   marcando só segunda a sexta (veja "Como faço para saber apenas dia
+   de semana?" — troque "Diário" por "Semanal" e marque os 5 dias),
+   num horário cedo o suficiente pro banker ter tempo de agir no dia.
+3. Ação: "Iniciar um programa".
+   - Programa/script: `"C:\Automacoes\...\cartoes_vencimento.bat"` (com aspas se o caminho tiver espaço)
+   - Adicionar argumentos: `silencioso`
+   - Iniciar em: a pasta do projeto
+
+Lembre da limitação de dias úteis mencionada na seção do boletim de
+cartões acima — vencimento em fim de semana pode não ter aviso a
+tempo.
+
+Nas três, na aba **Geral** das Propriedades da tarefa, use **"Executar
 somente quando o usuário estiver conectado"** (evita o erro de logon
 0x8007**0569** comum com contas de domínio corporativas rodando "estando
 conectado ou não").

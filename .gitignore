@@ -9,6 +9,7 @@ config/settings.yaml
 *.xls
 !config/saldos.example.xlsx
 !config/vencimentos.example.xlsx
+!config/cartoes.example.xlsx
 
 # Saída de teste (dry-run) — pode conter dado de cliente em HTML local
 saida_teste/*.html
