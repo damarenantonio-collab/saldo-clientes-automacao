@@ -145,6 +145,23 @@ A imagem usa a mesma fonte do texto (Georgia). O gerador procura
 serifada genérica se não encontrar — então funciona em qualquer
 máquina, mas fica visualmente mais fiel no Windows.
 
+## Anexo em Excel
+
+Além da tabela como imagem no corpo, cada e-mail vem com um `.xlsx`
+anexado de verdade (`src/anexo_excel.py`), com os mesmos dados daquele
+banker — útil pra quem quer abrir numa planilha própria em vez de só
+olhar a imagem. Só tem os dados desse banker (mesmo `grupo.clientes`
+já filtrado), então a mesma garantia de acesso por banker vale aqui.
+
+- Saldo: `saldo_<banker_id>_<data>.xlsx`, colunas Cliente/Conta/Saldo.
+- Vencimentos: `vencimentos_<banker_id>_<ano-mês>.xlsx`,
+  colunas Cliente/Produto/Vencimento/Valor Líquido — só é anexado
+  quando o banker tem vencimento naquele mês (senão o e-mail já vem
+  sem tabela nenhuma, e sem anexo também).
+
+No `--dry-run`, o `.xlsx` é gravado em `saida_teste/` junto do `.html`,
+pra conferir antes de enviar de verdade.
+
 ## Como o acesso por banker é garantido
 
 Vale para os dois boletins — ambos usam o mesmo `src/agrupador.py`.
@@ -274,11 +291,13 @@ tem histórico próprio ainda (veja "Próximos passos possíveis").
 
 ## Próximos passos possíveis
 
-- Automatizar o download das duas planilhas, se houver exportação
-  agendável, eliminando o passo manual antes do Agendador de Tarefas
-  rodar.
+- Automatizar o download das duas planilhas do portal do BTG: hoje é
+  manual porque automatizar o login exigiria guardar a senha do banco
+  na máquina, sem opção de e-mail/relatório agendado nem API — avaliado
+  e propositalmente deixado de fora por enquanto (risco de segurança e
+  de violar termos de uso do BTG). Reconsiderar se o BTG passar a
+  oferecer exportação agendada por e-mail ou API oficial.
 - Trocar o código do cliente por um nome legível no e-mail — é só
   fornecer um mapeamento código → nome e ajustar `email_builder.py` /
   `email_builder_vencimentos.py`.
-- Anexar o saldo/vencimentos em Excel além do corpo do e-mail.
 - Histórico de envios pro boletim de vencimentos (hoje só o de saldo tem).

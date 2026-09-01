@@ -17,9 +17,11 @@ from pathlib import Path
 
 import yaml
 
-from src import agrupador, bankers, email_builder, history_log, notify, saldos, tabela_imagem
+from src import agrupador, anexo_excel, bankers, email_builder, history_log, notify, saldos, tabela_imagem
 
 ROOT = Path(__file__).resolve().parent
+
+COLUNAS_ANEXO = {"cliente": "Cliente", "conta": "Conta", "saldo": "Saldo"}
 
 
 def setup_logging(log_dir: Path) -> logging.Logger:
@@ -101,6 +103,8 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
         subject = assunto_template.format(banker=grupo.banker_nome, data=data_ref.strftime("%d/%m/%Y"))
         imagem_png = tabela_imagem.gerar_png(grupo)
         cid = f"saldo-{grupo.banker_id}"
+        xlsx_bytes = anexo_excel.gerar_xlsx(grupo.clientes, COLUNAS_ANEXO)
+        nome_anexo = f"saldo_{grupo.banker_id}_{data_ref.strftime('%Y-%m-%d')}.xlsx"
 
         if dry_run:
             data_uri = "data:image/png;base64," + base64.b64encode(imagem_png).decode("ascii")
@@ -108,6 +112,7 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
             saida_teste.mkdir(parents=True, exist_ok=True)
             destino = saida_teste / f"{grupo.banker_id}.html"
             destino.write_text(html_body, encoding="utf-8")
+            (saida_teste / nome_anexo).write_bytes(xlsx_bytes)
             logger.info("[DRY-RUN] E-mail de %s gravado em %s (nada foi enviado).", grupo.banker_nome, destino)
             continue
 
@@ -120,6 +125,7 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
                 lambda aviso, g=grupo, c=cid: email_builder.montar_corpo_html(
                     g, assinatura, data_ref, f"cid:{c}", aviso_teste=aviso
                 ),
+                anexos=[(xlsx_bytes, nome_anexo)],
             )
         except Exception as exc:
             logger.error("Falha ao enviar e-mail para banker %s: %s", grupo.banker_id, exc, exc_info=True)

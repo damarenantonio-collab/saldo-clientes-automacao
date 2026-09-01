@@ -10,6 +10,7 @@ daquele banker — nunca em lote/CC/BCC com outros bankers juntos.
 
 import logging
 import smtplib
+from email.mime.application import MIMEApplication
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -25,23 +26,36 @@ def _smtp_send(
     subject: str,
     html_body: str,
     imagens: list[tuple[bytes, str]] | None = None,
+    anexos: list[tuple[bytes, str]] | None = None,
 ) -> None:
     """`imagens` é uma lista de (png_bytes, cid) — uma por tabela embutida
-    no e-mail (o boletim combinado tem duas: saldo e vencimentos)."""
-    msg = MIMEMultipart("related")
+    no e-mail (o boletim combinado tem duas: saldo e vencimentos).
+    `anexos` é uma lista de (xlsx_bytes, nome_arquivo) — anexo de verdade,
+    não embutido no corpo."""
+    msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
     msg["From"] = cfg["remetente"]
     msg["To"] = destinatario
 
+    corpo = MIMEMultipart("related")
     alternativo = MIMEMultipart("alternative")
     alternativo.attach(MIMEText(html_body, "html", "utf-8"))
-    msg.attach(alternativo)
+    corpo.attach(alternativo)
 
     for imagem_png, cid in imagens or []:
         imagem = MIMEImage(imagem_png)
         imagem.add_header("Content-ID", f"<{cid}>")
         imagem.add_header("Content-Disposition", "inline", filename=f"{cid}.png")
-        msg.attach(imagem)
+        corpo.attach(imagem)
+
+    msg.attach(corpo)
+
+    for anexo_bytes, nome_arquivo in anexos or []:
+        anexo = MIMEApplication(
+            anexo_bytes, _subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        anexo.add_header("Content-Disposition", "attachment", filename=nome_arquivo)
+        msg.attach(anexo)
 
     host = cfg.get("smtp_host", "smtp.gmail.com")
     port = int(cfg.get("smtp_port", 587))
@@ -58,6 +72,7 @@ def enviar_email_banker(
     subject: str,
     imagens: list[tuple[bytes, str]],
     html_body_factory,
+    anexos: list[tuple[bytes, str]] | None = None,
 ) -> None:
     """Envia (ou simula, em modo teste) o e-mail de um banker.
 
@@ -65,6 +80,8 @@ def enviar_email_banker(
     tabela como `cid:<cid>`, usando o mesmo `cid` passado em `imagens`)
     — recebe o aviso a exibir no topo quando em modo teste, ou None em
     envio real. `imagens=[]` quando não há tabela nenhuma pra anexar.
+    `anexos` é uma lista de (xlsx_bytes, nome_arquivo) — anexo de
+    verdade (não embutido no corpo), com os mesmos dados da tabela.
     """
     modo_teste = (email_cfg.get("modo_teste") or {}).get("ativo", False)
 
@@ -77,7 +94,7 @@ def enviar_email_banker(
         aviso = None
 
     html_body = html_body_factory(aviso)
-    _smtp_send(email_cfg, destinatario, subject, html_body, imagens=imagens)
+    _smtp_send(email_cfg, destinatario, subject, html_body, imagens=imagens, anexos=anexos)
     logger.info(
         "E-mail enviado: banker=%s destinatario=%s modo_teste=%s",
         grupo.banker_id,
