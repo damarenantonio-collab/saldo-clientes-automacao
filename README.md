@@ -1,63 +1,69 @@
 # Saldo Clientes — Automação
 
-Dois e-mails automáticos, de fontes diferentes:
+Dois e-mails automáticos, a partir de duas planilhas consolidadas do
+escritório inteiro (fontes diferentes, independentes uma da outra):
 
-- **`main.py`** — saldo em conta corrente, todo dia, a partir do Excel
-  do BTG (`Saldo_em_CC_BTG.xlsx`, aba "Saldo Diário"). Hoje só a
-  Viviane tem esse boletim.
+- **`main.py`** — saldo em conta corrente, todo dia, a partir de
+  `Saldo_em_CC_BTG.xlsx`.
 - **`vencimentos_mensal.py`** — vencimentos de renda fixa do mês, uma
   vez por mês (dia 1, via gatilho mensal do Agendador de Tarefas), a
-  partir da planilha consolidada do escritório inteiro
-  (`Vencimentos_RF.xlsx`, aba "Export"). Um e-mail por responsável
-  (banker) — hoje Eduardo Rego, Viviane Brandão e Antonio Carvalho.
+  partir de `Vencimentos_RF.xlsx`.
 
-São fontes de dados diferentes e independentes uma da outra — não é
-preciso que um cliente apareça nas duas pra funcionar.
+Os dois são multi-banker: cada planilha já traz o responsável de cada
+linha (coluna "Responsável"), então cada boletim manda um e-mail por
+banker, cada um só com os seus próprios clientes — hoje Eduardo Rego,
+Viviane Brandão e Antonio Carvalho.
+
+## Como o banker é identificado
+
+As duas planilhas seguem o mesmo princípio: uma aba **"Export"** com
+uma coluna **"Responsável"** trazendo o nome do banker daquela linha.
+`src/bankers.slugify_banker()` transforma esse nome num `banker_id`
+(minúsculo, sem acento, espaço vira underscore):
+
+```
+"Eduardo Rego"     -> eduardo_rego
+"Viviane Brandão"  -> viviane_brandao
+"Antonio Carvalho" -> antonio_carvalho
+```
+
+Esse `banker_id` precisa existir em `config/bankers.csv` com um e-mail
+cadastrado — se um responsável aparecer numa das planilhas sem estar
+em `bankers.csv`, ele entra na lista de pendências e o responsável
+pela automação é avisado por e-mail (veja `alerta_email`), mas nada é
+enviado pra esse banker até você cadastrá-lo. Isso vale pra quantos
+responsáveis as planilhas tiverem — crescer o time não exige mudar
+código, só adicionar uma linha em `bankers.csv`.
 
 ## Boletim de saldo (main.py)
 
-1. Você baixa o Excel do BTG (manualmente, por enquanto) e salva sempre
-   no mesmo caminho — ex: `C:/Saldo/Saldo_em_CC_BTG.xlsx`.
-2. `settings.yaml` aponta pra esse caminho (`saldos_xlsx`) e diz qual é
-   o `banker_id` responsável por todo o arquivo (`banker_padrao`).
-3. Ao rodar `python main.py`, o script lê a aba "Saldo Diário", monta um
-   e-mail com todas as contas do arquivo, e envia pro e-mail do banker
-   correspondente.
+1. Você baixa a planilha consolidada de saldo (manualmente, por
+   enquanto) e salva sempre no mesmo caminho — ex:
+   `C:/Saldo/Saldo_em_CC_BTG.xlsx`.
+2. Ao rodar `python main.py`, o script lê a aba "Export", agrupa por
+   responsável, e envia um e-mail por banker com só as contas dele.
 
-### Formato do Excel do BTG
-
-O script lê a aba **"Saldo Diário"**, que tem estas colunas (o nome
-exato pode variar um pouco entre exportações — o script tolera isso):
+### Formato da planilha de saldo
 
 | coluna              | descrição                                  |
 |---------------------|----------------------------------------------|
-| `Conta do BTG`       | número da conta                              |
-| `Código do Cliente`  | código do cliente (ex: `AOAK_MA`) — o BTG não exporta o nome completo aqui, só o código |
-| `Saldo`              | saldo em conta corrente (não investido)      |
+| `Conta BTG`          | número da conta                              |
+| `Nome do Cliente`    | nome/código do cliente                       |
+| `Saldo`              | saldo em conta corrente (não investido) — aceita negativo |
+| `Responsável`        | nome do banker — vira o `banker_id`          |
 
-Um mesmo código de cliente pode aparecer em mais de uma linha, se tiver
-mais de uma conta — cada linha vira uma linha na tabela do e-mail.
-
-### Um único banker (por enquanto)
-
-O BTG não exporta quem é o responsável por cada cliente nessa
-planilha — então `banker_padrao`, em `settings.yaml`, é atribuído a
-toda linha do arquivo. Se um dia esse boletim precisar cobrir mais de
-um banker, o jeito é o mesmo já usado no boletim de vencimentos (veja
-"Como o banker é identificado" abaixo): crie (ou peça pro BTG) um
-export do saldo que já traga o responsável de cada conta, e adapte
-`src/saldos.py` pra derivar `banker_id` direto dessa coluna, em vez do
-`banker_padrao` fixo.
+Um mesmo cliente pode aparecer em mais de uma linha, se tiver mais de
+uma conta — cada linha vira uma linha na tabela do e-mail.
 
 ## Boletim de vencimentos (vencimentos_mensal.py)
 
-Lê a aba **"Export"** da planilha consolidada de vencimentos do
-escritório e envia, uma vez por mês, a lista de ativos de renda fixa
-que vencem naquele mês — um e-mail por responsável, cada um só com os
-vencimentos dos seus próprios clientes. Se um responsável não tiver
-nenhum vencimento no mês, ele recebe o e-mail mesmo assim, só sem
-tabela (avisando que não há vencimento naquele mês) — em vez de ficar
-em silêncio, o que poderia parecer que a automação esqueceu dele.
+Lê a aba **"Export"** da planilha consolidada de vencimentos e envia,
+uma vez por mês, a lista de ativos de renda fixa que vencem naquele
+mês — um e-mail por responsável, cada um só com os vencimentos dos
+seus próprios clientes. Se um responsável não tiver nenhum vencimento
+no mês, ele recebe o e-mail mesmo assim, só sem tabela (avisando que
+não há vencimento naquele mês) — em vez de ficar em silêncio, o que
+poderia parecer que a automação esqueceu dele.
 
 ### Formato da planilha de vencimentos
 
@@ -68,31 +74,9 @@ em silêncio, o que poderia parecer que a automação esqueceu dele.
 | `Descrição`           | tipo do ativo (ex: `CDB`, `LCI`, `TESOURO DIRETO - NTN-B`) |
 | `Valor Líquido`       | valor mostrado na tabela                          |
 | `Data Vencimento`     | data de vencimento — usada pra filtrar o mês      |
-| `Responsável`         | nome do banker — vira o `banker_id` (veja abaixo) |
+| `Responsável`         | nome do banker — vira o `banker_id`               |
 
 `Data Movimentação` existe na planilha mas não é usada.
-
-### Como o banker é identificado
-
-Diferente do saldo, essa planilha **já traz o responsável de cada
-linha** — não precisa de `banker_padrao` nem de mapeamento manual.
-`src/vencimentos.py` deriva o `banker_id` direto do nome em
-"Responsável", normalizando pra minúsculo/sem acento/com underscore:
-
-```
-"Eduardo Rego"    -> eduardo_rego
-"Viviane Brandão" -> viviane_brandao
-"Antonio Carvalho" -> antonio_carvalho
-```
-
-Esse `banker_id` precisa existir em `config/bankers.csv` com um
-e-mail cadastrado — se um responsável aparecer na planilha (em
-qualquer mês) sem estar em `bankers.csv`, ele entra na lista de
-pendências e o responsável pela automação é avisado por e-mail (veja
-`alerta_email`), mas nada é enviado pra esse banker até você
-cadastrá-lo. Isso vale pra quantos responsáveis a planilha tiver —
-crescer o time não exige mudar código, só adicionar uma linha em
-`bankers.csv`.
 
 ### Qual mês é mostrado
 
@@ -119,7 +103,7 @@ final — ele passa primeiro por uma caixa de revisão (hoje, o e-mail
 profissional de quem administra a automação), e essa pessoa encaminha
 manualmente para o banker depois. Isso é permanente, não uma etapa de
 teste a ser removida depois. Vale pros dois boletins, e pra todos os
-bankers — inclusive Eduardo Rego, não só a Viviane.
+bankers.
 
 Isso é implementado sem nenhuma lógica especial: o campo `email` em
 `bankers.csv` é o endereço de **entrega** da automação, que pode ser
@@ -130,16 +114,10 @@ pra caixa de outra pessoa; não é um erro de configuração.
 
 ```csv
 banker_id,banker_nome,email
-vbrandao,Viviane,acarvalho@hortocapital.com.br
 eduardo_rego,Eduardo Rego,acarvalho@hortocapital.com.br
 viviane_brandao,Viviane Brandão,acarvalho@hortocapital.com.br
 antonio_carvalho,Antonio Carvalho,acarvalho@hortocapital.com.br
 ```
-
-(repare que `vbrandao` — usado pelo boletim de saldo — e
-`viviane_brandao` — derivado da planilha de vencimentos — são a mesma
-pessoa, com `banker_id`s diferentes porque vêm de fontes de dados
-diferentes; isso é normal, não precisa unificar.)
 
 Se um dia quiser que a automação envie direto pro banker (pulando a
 revisão manual), é só trocar o `email` daquela linha pelo e-mail do
@@ -198,12 +176,10 @@ Vale para os dois boletins — ambos usam o mesmo `src/agrupador.py`.
 2. Dê duplo clique em **`instalar.bat`**.
 3. Copie `config/bankers.example.csv` → `config/bankers.csv` e preencha
    com os bankers reais (`banker_id`, nome, e-mail) — veja "Como o
-   banker é identificado" acima pra saber o `banker_id` de cada
-   responsável do boletim de vencimentos.
+   banker é identificado" acima pra saber o `banker_id` de cada um.
 4. Copie `config/settings.example.yaml` → `config/settings.yaml` e
    ajuste:
-   - `saldos_xlsx`: caminho de onde você salva o Excel de saldo do BTG;
-   - `banker_padrao`: o `banker_id` do boletim de saldo;
+   - `saldos_xlsx`: caminho da planilha consolidada de saldo;
    - `vencimentos_xlsx`: caminho da planilha consolidada de vencimentos;
    - `email:` com os dados de SMTP da empresa — **deixe
      `modo_teste.ativo: true`** enquanto estiver testando (veja abaixo).
@@ -247,8 +223,8 @@ São **duas tarefas separadas** — os boletins são independentes.
 
 ### Saldo (todo dia)
 
-1. Baixe o Excel do BTG e salve no caminho configurado em `saldos_xlsx`
-   **antes** do horário agendado (isso ainda é manual).
+1. Baixe/atualize a planilha de saldo e salve no caminho configurado em
+   `saldos_xlsx` **antes** do horário agendado (isso ainda é manual).
 2. Agendador de Tarefas → "Criar Tarefa Básica" → gatilho **Diariamente**.
 3. Ação: "Iniciar um programa".
    - Programa/script: `C:\Automacoes\...\atualizar.bat`
@@ -263,6 +239,8 @@ São **duas tarefas separadas** — os boletins são independentes.
 2. Agendador de Tarefas → "Criar Tarefa Básica" → gatilho
    **Mensalmente** → marque o dia 1 (ou o dia do mês que preferir) →
    escolha um horário depois que a planilha já estiver atualizada.
+   No campo **"Meses"**, marque todos os 12 (se ficar em branco, a
+   tarefa não dispara em nenhum mês).
 3. Ação: "Iniciar um programa".
    - Programa/script: `C:\Automacoes\...\vencimentos_mensal.bat`
    - Adicionar argumentos: `silencioso`
@@ -282,7 +260,7 @@ conectado ou não").
 
 | coluna         | descrição                          |
 |----------------|--------------------------------------|
-| `banker_id`    | identificador do banker — pro saldo é o valor de `banker_padrao`; pros vencimentos é derivado do nome em "Responsável" (veja "Como o banker é identificado") |
+| `banker_id`    | identificador do banker — derivado do nome em "Responsável" nas planilhas (veja "Como o banker é identificado") |
 | `banker_nome`  | nome usado na saudação do e-mail ("Bom dia \<primeiro nome\>") — sempre o do banker de verdade |
 | `email`        | endereço de **entrega** — pode ser o do próprio banker, ou o de uma caixa de revisão que encaminha manualmente depois (veja "Revisão manual antes de chegar ao banker") |
 
@@ -296,12 +274,11 @@ tem histórico próprio ainda (veja "Próximos passos possíveis").
 
 ## Próximos passos possíveis
 
-- Automatizar o download dos dois arquivos (saldo e vencimentos), se o
-  BTG/sistema interno tiver exportação agendável, eliminando o passo
-  manual antes do Agendador de Tarefas rodar.
-- Trocar o código do cliente por um nome legível no boletim de saldo —
-  é só fornecer um mapeamento código → nome e ajustar `email_builder.py`.
-- Estender o boletim de saldo pra múltiplos bankers, do mesmo jeito que
-  o de vencimentos já faz (veja "Um único banker (por enquanto)" acima).
+- Automatizar o download das duas planilhas, se houver exportação
+  agendável, eliminando o passo manual antes do Agendador de Tarefas
+  rodar.
+- Trocar o código do cliente por um nome legível no e-mail — é só
+  fornecer um mapeamento código → nome e ajustar `email_builder.py` /
+  `email_builder_vencimentos.py`.
 - Anexar o saldo/vencimentos em Excel além do corpo do e-mail.
 - Histórico de envios pro boletim de vencimentos (hoje só o de saldo tem).

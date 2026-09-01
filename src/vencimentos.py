@@ -1,20 +1,20 @@
 """Leitura e validação dos vencimentos de renda fixa, a partir da
 planilha consolidada do escritório inteiro (`Vencimentos_RF.xlsx`,
-aba "Export") — diferente da planilha individual do BTG usada pelo
-boletim de saldo.
+aba "Export").
 
 Essa planilha já traz o banker responsável por cada linha (coluna
-"Responsável"), então — ao contrário de src/saldos.py — não precisa de
-um `banker_padrao`: o banker_id de cada linha vem direto do arquivo,
-suportando quantos responsáveis existirem sem configuração extra.
+"Responsável") — o banker_id de cada linha vem direto do arquivo
+(veja `src/bankers.slugify_banker`), suportando quantos responsáveis
+existirem sem configuração extra. Mesmo princípio de src/saldos.py.
 """
 
-import re
 import unicodedata
 from datetime import date
 from pathlib import Path
 
 import pandas as pd
+
+from .bankers import slugify_banker
 
 SHEET_PADRAO = "Export"
 
@@ -34,14 +34,6 @@ COLUNAS_TEXTO = ["conta", "cliente", "produto", "responsavel"]
 def _normalizar(texto: str) -> str:
     sem_acento = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
     return sem_acento.strip().lower()
-
-
-def slugify_banker(nome: str) -> str:
-    """Transforma "Eduardo Rego" em "eduardo_rego" — usado como
-    `banker_id` (precisa bater com o `banker_id` cadastrado em
-    bankers.csv)."""
-    sem_acento = _normalizar(nome)
-    return re.sub(r"[^a-z0-9]+", "_", sem_acento).strip("_")
 
 
 def _carregar_bruto(planilha_xlsx: Path, sheet_name: str) -> pd.DataFrame:

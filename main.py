@@ -43,7 +43,6 @@ def load_settings(config_path: Path) -> dict:
 def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
     saldos_xlsx = (ROOT / settings["saldos_xlsx"]).resolve()
     bankers_csv = (ROOT / settings["bankers_csv"]).resolve()
-    banker_padrao = settings["banker_padrao"]
     sheet_name = settings.get("saldos_sheet", saldos.SHEET_PADRAO)
 
     if not saldos_xlsx.exists():
@@ -57,7 +56,7 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
             f"config/bankers.csv e preencha com seus bankers."
         )
 
-    df_saldos = saldos.load_saldos(saldos_xlsx, banker_padrao, sheet_name=sheet_name)
+    df_saldos = saldos.load_saldos(saldos_xlsx, sheet_name=sheet_name)
     mapa_bankers = bankers.load_bankers(bankers_csv)
     log_sensivel = settings.get("log_dados_sensiveis", False)
 
@@ -74,8 +73,8 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
             settings,
             subject=f"[Saldo Clientes] {len(pendentes)} banker(s) sem e-mail cadastrado",
             body=(
-                f"Os banker_id(s) abaixo aparecem em saldos.csv mas não têm e-mail "
-                f"cadastrado em bankers.csv — os clientes deles NÃO foram enviados "
+                f"Os banker_id(s) abaixo aparecem na planilha de saldo (responsável) mas não "
+                f"têm e-mail cadastrado em bankers.csv — os clientes deles NÃO foram enviados "
                 f"nesta execução:\n\n" + "\n".join(f"- {b}" for b in pendentes)
             ),
         )

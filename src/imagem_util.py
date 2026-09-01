@@ -32,9 +32,10 @@ def carregar_fonte(caminhos: list[str], tamanho: int) -> ImageFont.FreeTypeFont:
 
 
 def fmt_moeda(valor: float) -> str:
-    texto = f"{valor:,.2f}"
+    sinal = "-" if valor < 0 else ""
+    texto = f"{abs(valor):,.2f}"
     texto = texto.replace(",", "_").replace(".", ",").replace("_", ".")
-    return f"R$ {texto}"
+    return f"{sinal}R$ {texto}"
 
 
 def escrever(draw, x, y0, y1, texto, fonte, cor, alinhar_direita_em=None):

@@ -2,20 +2,17 @@
 # settings.yaml NÃO é versionado (está no .gitignore) porque contém
 # credenciais de e-mail e caminhos de arquivos locais.
 
-# Caminho do Excel de saldo em conta baixado do BTG (o mesmo arquivo que
-# hoje você baixa manualmente do portal). Veja config/saldos.example.xlsx
-# pro formato esperado.
+# Caminho da planilha CONSOLIDADA de saldo em conta do escritório
+# inteiro (ex: "Saldo_em_CC_BTG.xlsx", baixada manualmente por enquanto).
+# Já traz o responsável (banker) de cada linha — dá pra ter quantos
+# bankers precisar sem configuração extra, o banker_id de cada um é
+# derivado do nome em "Responsável" (ex: "Eduardo Rego" -> "eduardo_rego")
+# e precisa existir em bankers.csv. Veja config/saldos.example.xlsx pro
+# formato esperado.
 saldos_xlsx: "C:/Saldo/Saldo_em_CC_BTG.xlsx"
 
-# Aba do Excel que tem o saldo em conta corrente (não o patrimônio total).
-saldos_sheet: "Saldo Diário"
-
-# O BTG não exporta qual banker atende cada cliente — hoje todos os
-# clientes do arquivo são deste banker_id (precisa existir em
-# bankers.csv). Quando houver mais de um banker, troque isso por um
-# mapeamento código de cliente -> banker_id (veja o README, seção
-# "Múltiplos bankers").
-banker_padrao: "seu_banker_id"
+# Aba da planilha de saldo.
+saldos_sheet: "Export"
 
 # Caminho do arquivo com o mapeamento banker -> e-mail. Veja
 # config/bankers.example.csv pro formato.
@@ -31,11 +28,8 @@ assunto_template: "Saldo em Conta - {data}"
 
 # --- Boletim de vencimentos (vencimentos_mensal.py) ---
 # Caminho da planilha CONSOLIDADA de vencimentos de renda fixa do
-# escritório inteiro (arquivo separado do saldo — ex: "Vencimentos_RF.xlsx").
-# Diferente do saldo, essa planilha já traz o responsável (banker) de
-# cada linha, então dá pra ter quantos bankers precisar sem configuração
-# extra — o banker_id de cada um é derivado do nome em "Responsável"
-# (ex: "Eduardo Rego" -> "eduardo_rego") e precisa existir em bankers.csv.
+# escritório (arquivo separado do saldo — ex: "Vencimentos_RF.xlsx").
+# Mesmo princípio do saldo (banker derivado da coluna "Responsável").
 vencimentos_xlsx: "C:/Saldo/Vencimentos_RF.xlsx"
 
 # Aba da planilha de vencimentos.

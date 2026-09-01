@@ -1,10 +1,24 @@
-"""Leitura do mapeamento banker_id -> nome/e-mail."""
+"""Leitura do mapeamento banker_id -> nome/e-mail, e a função que
+deriva um banker_id a partir do nome do responsável nas planilhas
+(saldo e vencimentos usam a mesma lógica).
+"""
 
+import re
+import unicodedata
 from pathlib import Path
 
 import pandas as pd
 
 REQUIRED_COLUMNS = {"banker_id", "banker_nome", "email"}
+
+
+def slugify_banker(nome: str) -> str:
+    """Transforma "Eduardo Rego" em "eduardo_rego" — usado como
+    `banker_id` (precisa bater com o `banker_id` cadastrado em
+    bankers.csv)."""
+    sem_acento = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode("ascii")
+    sem_acento = sem_acento.strip().lower()
+    return re.sub(r"[^a-z0-9]+", "_", sem_acento).strip("_")
 
 
 def load_bankers(bankers_csv: Path) -> dict:
