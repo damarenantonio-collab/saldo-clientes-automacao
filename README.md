@@ -114,9 +114,9 @@ pra caixa de outra pessoa; não é um erro de configuração.
 
 ```csv
 banker_id,banker_nome,email
-eduardo_rego,Eduardo Rego,acarvalho@hortocapital.com.br
-viviane_brandao,Viviane Brandão,acarvalho@hortocapital.com.br
-antonio_carvalho,Antonio Carvalho,acarvalho@hortocapital.com.br
+fulano_silva,Fulano Silva,revisor@suaempresa.com.br
+beltrano_souza,Beltrano Souza,revisor@suaempresa.com.br
+ciclano_nunes,Ciclano Nunes,revisor@suaempresa.com.br
 ```
 
 Se um dia quiser que a automação envie direto pro banker (pulando a
