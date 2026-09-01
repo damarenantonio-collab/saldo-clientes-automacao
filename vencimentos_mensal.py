@@ -25,12 +25,10 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from src import agrupador, anexo_excel, bankers, email_builder_vencimentos, notify, tabela_vencimentos_imagem, vencimentos
+from src import agrupador, bankers, email_builder_vencimentos, notify, tabela_vencimentos_imagem, vencimentos
 from src.meses import nome_mes
 
 ROOT = Path(__file__).resolve().parent
-
-COLUNAS_ANEXO = {"cliente": "Cliente", "produto": "Produto", "vencimento": "Vencimento", "valor_liquido": "Valor Líquido"}
 
 
 def setup_logging(log_dir: Path) -> logging.Logger:
@@ -142,12 +140,6 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool, mes_ref: date) ->
         imagem_png = tabela_vencimentos_imagem.gerar_png(grupo) if qtd > 0 else None
         cid = f"vencimentos-{grupo.banker_id}"
 
-        anexos = []
-        if qtd > 0:
-            xlsx_bytes = anexo_excel.gerar_xlsx(grupo.clientes, COLUNAS_ANEXO)
-            nome_anexo = f"vencimentos_{grupo.banker_id}_{mes_ref.strftime('%Y-%m')}.xlsx"
-            anexos = [(xlsx_bytes, nome_anexo)]
-
         if dry_run:
             data_uri = None
             if imagem_png is not None:
@@ -156,8 +148,6 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool, mes_ref: date) ->
             saida_teste.mkdir(parents=True, exist_ok=True)
             destino = saida_teste / f"vencimentos-{grupo.banker_id}.html"
             destino.write_text(html_body, encoding="utf-8")
-            for xlsx_bytes, nome_anexo in anexos:
-                (saida_teste / nome_anexo).write_bytes(xlsx_bytes)
             logger.info("[DRY-RUN] E-mail de vencimentos de %s gravado em %s (nada foi enviado).", grupo.banker_nome, destino)
             continue
 
@@ -171,7 +161,6 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool, mes_ref: date) ->
                 lambda aviso, g=grupo, c=cid, img=imagem_png: email_builder_vencimentos.montar_corpo_html(
                     g, assinatura, mes_ref, (f"cid:{c}" if img is not None else None), aviso_teste=aviso
                 ),
-                anexos=anexos,
             )
         except Exception as exc:
             logger.error("Falha ao enviar e-mail de vencimentos para banker %s: %s", grupo.banker_id, exc, exc_info=True)
