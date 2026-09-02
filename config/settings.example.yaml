@@ -11,8 +11,11 @@
 # formato esperado.
 saldos_xlsx: "C:/Saldo/Saldo_em_CC_BTG.xlsx"
 
-# Aba da planilha de saldo.
-saldos_sheet: "Export"
+# A planilha de saldo tem duas abas com o mesmo formato — cada uma vira
+# uma tabela separada no e-mail (Investimentos e Banking). Se um banker
+# não tiver cliente numa das duas, a tabela correspondente é omitida.
+saldos_sheet_investimentos: "Investimentos"
+saldos_sheet_banking: "Banking"
 
 # Caminho do arquivo com o mapeamento banker -> e-mail. Veja
 # config/bankers.example.csv pro formato.

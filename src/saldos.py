@@ -1,8 +1,9 @@
 """Leitura e validação do saldo em conta dos clientes, a partir da
-planilha consolidada do escritório inteiro (`Saldo_em_CC_BTG.xlsx`,
-aba "Export").
+planilha consolidada do escritório inteiro (`Saldo_em_CC_BTG.xlsx`).
 
-Essa planilha já traz o banker responsável por cada linha (coluna
+Essa planilha tem duas abas com o mesmo formato — "Investimentos" e
+"Banking" — cada uma virando uma tabela separada no e-mail (veja
+main.py). Cada linha já traz o banker responsável (coluna
 "Responsável") — o banker_id de cada linha vem direto do arquivo
 (veja `src/bankers.slugify_banker`), suportando quantos responsáveis
 existirem sem configuração extra. Mesmo princípio de src/vencimentos.py.
@@ -15,17 +16,8 @@ import pandas as pd
 
 from .bankers import slugify_banker
 
-SHEET_PADRAO = "Export"
-
-# aceita pequenas variações de nome de coluna entre exportações do BTG
-ALIASES_COLUNA = {
-    "conta btg": "conta",
-    "conta do btg": "conta",
-    "nome do cliente": "cliente",
-    "codigo do cliente": "cliente",
-    "saldo": "saldo",
-    "responsavel": "responsavel",
-}
+SHEET_INVESTIMENTOS_PADRAO = "Investimentos"
+SHEET_BANKING_PADRAO = "Banking"
 
 COLUNAS_ORIGEM = ["conta", "cliente", "saldo", "responsavel"]
 
@@ -35,9 +27,25 @@ def _normalizar(texto: str) -> str:
     return sem_acento.strip().lower()
 
 
-def load_saldos(saldos_xlsx: Path, sheet_name: str = SHEET_PADRAO) -> pd.DataFrame:
-    """Lê a planilha de saldo em conta e retorna um DataFrame com as
-    colunas internas `banker_id`, `cliente`, `conta`, `saldo`.
+def _mapear_coluna(nome_coluna: str) -> str | None:
+    """Aceita pequenas variações de nome de coluna entre exportações do
+    BTG — inclusive a coluna de saldo tendo um nome diferente por aba
+    (ex: "Saldo" em Investimentos, "Saldo Banking (R$)" em Banking)."""
+    chave = _normalizar(nome_coluna)
+    if chave in ("conta btg", "conta do btg"):
+        return "conta"
+    if chave in ("nome do cliente", "codigo do cliente"):
+        return "cliente"
+    if chave.startswith("saldo"):
+        return "saldo"
+    if chave == "responsavel":
+        return "responsavel"
+    return None
+
+
+def load_saldos(saldos_xlsx: Path, sheet_name: str) -> pd.DataFrame:
+    """Lê uma aba da planilha de saldo em conta e retorna um DataFrame
+    com as colunas internas `banker_id`, `cliente`, `conta`, `saldo`.
 
     Uma linha por conta (um mesmo cliente pode ter mais de uma conta).
     """
@@ -45,7 +53,7 @@ def load_saldos(saldos_xlsx: Path, sheet_name: str = SHEET_PADRAO) -> pd.DataFra
 
     renomear = {}
     for coluna in bruto.columns:
-        chave = ALIASES_COLUNA.get(_normalizar(str(coluna)))
+        chave = _mapear_coluna(str(coluna))
         if chave:
             renomear[coluna] = chave
 

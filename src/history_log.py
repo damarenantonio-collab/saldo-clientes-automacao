@@ -10,10 +10,13 @@ import pandas as pd
 from .agrupador import GrupoBanker
 
 
-def append_snapshot(grupos: list[GrupoBanker], data_referencia: date, history_path: Path) -> None:
+def append_snapshot(grupos: list[GrupoBanker], categoria: str, data_referencia: date, history_path: Path) -> None:
+    """`categoria` é "investimentos" ou "banking" — cada aba da
+    planilha de saldo gera sua própria linha de histórico."""
     linhas = [
         {
             "data": data_referencia.isoformat(),
+            "categoria": categoria,
             "banker_id": g.banker_id,
             "banker_nome": g.banker_nome,
             "qtd_clientes": len(g.clientes),

@@ -21,10 +21,10 @@ veja a seção própria dele abaixo.
 
 ## Como o banker é identificado
 
-As duas planilhas seguem o mesmo princípio: uma aba **"Export"** com
-uma coluna **"Responsável"** trazendo o nome do banker daquela linha.
-`src/bankers.slugify_banker()` transforma esse nome num `banker_id`
-(minúsculo, sem acento, espaço vira underscore):
+As planilhas de saldo e vencimentos seguem o mesmo princípio: uma (ou
+mais) aba(s) com uma coluna **"Responsável"** trazendo o nome do
+banker daquela linha. `src/bankers.slugify_banker()` transforma esse
+nome num `banker_id` (minúsculo, sem acento, espaço vira underscore):
 
 ```
 "Eduardo Rego"     -> eduardo_rego
@@ -45,20 +45,31 @@ código, só adicionar uma linha em `bankers.csv`.
 1. Você baixa a planilha consolidada de saldo (manualmente, por
    enquanto) e salva sempre no mesmo caminho — ex:
    `C:/Saldo/Saldo_em_CC_BTG.xlsx`.
-2. Ao rodar `python main.py`, o script lê a aba "Export", agrupa por
-   responsável, e envia um e-mail por banker com só as contas dele.
+2. Ao rodar `python main.py`, o script lê as **duas abas** da
+   planilha (`saldos_sheet_investimentos` e `saldos_sheet_banking`,
+   por padrão "Investimentos" e "Banking"), agrupa cada uma por
+   responsável, e envia **um e-mail por banker** com duas tabelas —
+   uma de cada aba.
 
-### Formato da planilha de saldo
+### Formato de cada aba da planilha de saldo
+
+Investimentos e Banking têm o mesmo formato — só o nome da coluna de
+saldo pode variar um pouco entre elas (ex: "Saldo" numa, "Saldo
+Banking (R$)" na outra — o script reconhece qualquer nome de coluna
+que comece com "Saldo"):
 
 | coluna              | descrição                                  |
 |---------------------|----------------------------------------------|
 | `Conta BTG`          | número da conta                              |
 | `Nome do Cliente`    | nome/código do cliente                       |
-| `Saldo`              | saldo em conta corrente (não investido) — aceita negativo |
+| `Saldo` (ou variação)| saldo daquela categoria — aceita negativo    |
 | `Responsável`        | nome do banker — vira o `banker_id`          |
 
-Um mesmo cliente pode aparecer em mais de uma linha, se tiver mais de
-uma conta — cada linha vira uma linha na tabela do e-mail.
+Um mesmo cliente pode aparecer em mais de uma linha na mesma aba, se
+tiver mais de uma conta — cada linha vira uma linha na tabela do
+e-mail. Se um banker não tiver nenhum cliente numa das duas abas, a
+tabela correspondente simplesmente não aparece no e-mail dele (sem
+aviso de "vazio").
 
 ## Boletim de vencimentos (vencimentos_mensal.py)
 
@@ -349,8 +360,9 @@ conectado ou não").
 ## Histórico
 
 Com `manter_historico: true` (padrão), a cada envio real do **boletim
-de saldo** é gravada uma linha por banker em
-`historico/envios_diarios.csv` com data, banker, quantidade de contas e
+de saldo** são gravadas duas linhas por banker em
+`historico/envios_diarios.csv` (uma pra Investimentos, outra pra
+Banking — coluna `categoria`) com data, banker, quantidade de contas e
 saldo total — **sem** detalhe por cliente. O boletim de vencimentos não
 tem histórico próprio ainda (veja "Próximos passos possíveis").
 

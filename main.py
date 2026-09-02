@@ -1,5 +1,6 @@
 """Envia por e-mail o saldo em conta dos clientes do family office — um
-e-mail por banker, contendo apenas os clientes daquele banker.
+e-mail por banker, contendo apenas os clientes daquele banker, com uma
+tabela de Investimentos e uma de Banking.
 
 Uso:
     python main.py [--config config/settings.yaml]
@@ -43,7 +44,8 @@ def load_settings(config_path: Path) -> dict:
 def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
     saldos_xlsx = (ROOT / settings["saldos_xlsx"]).resolve()
     bankers_csv = (ROOT / settings["bankers_csv"]).resolve()
-    sheet_name = settings.get("saldos_sheet", saldos.SHEET_PADRAO)
+    sheet_investimentos = settings.get("saldos_sheet_investimentos", saldos.SHEET_INVESTIMENTOS_PADRAO)
+    sheet_banking = settings.get("saldos_sheet_banking", saldos.SHEET_BANKING_PADRAO)
 
     if not saldos_xlsx.exists():
         raise RuntimeError(
@@ -56,18 +58,23 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
             f"config/bankers.csv e preencha com seus bankers."
         )
 
-    df_saldos = saldos.load_saldos(saldos_xlsx, sheet_name=sheet_name)
+    df_investimentos = saldos.load_saldos(saldos_xlsx, sheet_name=sheet_investimentos)
+    df_banking = saldos.load_saldos(saldos_xlsx, sheet_name=sheet_banking)
     mapa_bankers = bankers.load_bankers(bankers_csv)
     log_sensivel = settings.get("log_dados_sensiveis", False)
 
     logger.info(
-        "Carregado(s) %d conta(s) de cliente da aba '%s'.",
-        len(df_saldos),
-        sheet_name,
+        "Carregado(s) %d conta(s) de cliente da aba '%s' e %d da aba '%s'.",
+        len(df_investimentos),
+        sheet_investimentos,
+        len(df_banking),
+        sheet_banking,
     )
 
-    grupos, pendentes = agrupador.agrupar_por_banker(df_saldos, mapa_bankers)
+    grupos_investimentos, pendentes_investimentos = agrupador.agrupar_por_banker(df_investimentos, mapa_bankers)
+    grupos_banking, pendentes_banking = agrupador.agrupar_por_banker(df_banking, mapa_bankers)
 
+    pendentes = sorted(set(pendentes_investimentos) | set(pendentes_banking))
     if pendentes:
         notify.send_alert(
             settings,
@@ -79,7 +86,11 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
             ),
         )
 
-    if not grupos:
+    por_banker_investimentos = {g.banker_id: g for g in grupos_investimentos}
+    por_banker_banking = {g.banker_id: g for g in grupos_banking}
+    todos_banker_ids = sorted(set(por_banker_investimentos) | set(por_banker_banking))
+
+    if not todos_banker_ids:
         logger.warning("Nenhum grupo de banker pronto para envio nesta execução.")
         return
 
@@ -90,40 +101,67 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
     saida_teste = ROOT / "saida_teste"
     falhas = []
 
-    for grupo in grupos:
-        qtd = len(grupo.clientes)
-        total = grupo.clientes["saldo"].sum()
-        if log_sensivel:
-            logger.info("Banker %s (%s): %d cliente(s), total R$ %.2f.", grupo.banker_nome, grupo.email, qtd, total)
-        else:
-            logger.info("Banker %s: %d cliente(s).", grupo.banker_nome, qtd)
+    for banker_id in todos_banker_ids:
+        grupo_inv = por_banker_investimentos.get(banker_id)
+        grupo_bank = por_banker_banking.get(banker_id)
+        banker_nome = (grupo_inv or grupo_bank).banker_nome
+        email = (grupo_inv or grupo_bank).email
 
-        subject = assunto_template.format(banker=grupo.banker_nome, data=data_ref.strftime("%d/%m/%Y"))
-        imagem_png = tabela_imagem.gerar_png(grupo)
-        cid = f"saldo-{grupo.banker_id}"
+        qtd_inv = len(grupo_inv.clientes) if grupo_inv else 0
+        qtd_bank = len(grupo_bank.clientes) if grupo_bank else 0
+        if log_sensivel:
+            logger.info(
+                "Banker %s (%s): %d conta(s) em Investimentos, %d em Banking.",
+                banker_nome,
+                email,
+                qtd_inv,
+                qtd_bank,
+            )
+        else:
+            logger.info("Banker %s: %d conta(s) em Investimentos, %d em Banking.", banker_nome, qtd_inv, qtd_bank)
+
+        subject = assunto_template.format(banker=banker_nome, data=data_ref.strftime("%d/%m/%Y"))
+
+        imagem_inv = tabela_imagem.gerar_png(grupo_inv) if grupo_inv else None
+        imagem_bank = tabela_imagem.gerar_png(grupo_bank) if grupo_bank else None
+        cid_inv = f"saldo-investimentos-{banker_id}"
+        cid_bank = f"saldo-banking-{banker_id}"
 
         if dry_run:
-            data_uri = "data:image/png;base64," + base64.b64encode(imagem_png).decode("ascii")
-            html_body = email_builder.montar_corpo_html(grupo, assinatura, data_ref, data_uri)
+            data_uri_inv = (
+                "data:image/png;base64," + base64.b64encode(imagem_inv).decode("ascii") if imagem_inv else None
+            )
+            data_uri_bank = (
+                "data:image/png;base64," + base64.b64encode(imagem_bank).decode("ascii") if imagem_bank else None
+            )
+            html_body = email_builder.montar_corpo_html(banker_nome, assinatura, data_ref, data_uri_inv, data_uri_bank)
             saida_teste.mkdir(parents=True, exist_ok=True)
-            destino = saida_teste / f"{grupo.banker_id}.html"
+            destino = saida_teste / f"{banker_id}.html"
             destino.write_text(html_body, encoding="utf-8")
-            logger.info("[DRY-RUN] E-mail de %s gravado em %s (nada foi enviado).", grupo.banker_nome, destino)
+            logger.info("[DRY-RUN] E-mail de %s gravado em %s (nada foi enviado).", banker_nome, destino)
             continue
+
+        imagens = [(imagem_inv, cid_inv)] if imagem_inv else []
+        imagens += [(imagem_bank, cid_bank)] if imagem_bank else []
 
         try:
             notify.enviar_email_banker(
                 settings["email"],
-                grupo,
+                grupo_inv or grupo_bank,
                 subject,
-                [(imagem_png, cid)],
-                lambda aviso, g=grupo, c=cid: email_builder.montar_corpo_html(
-                    g, assinatura, data_ref, f"cid:{c}", aviso_teste=aviso
+                imagens,
+                lambda aviso, img_i=imagem_inv, img_b=imagem_bank: email_builder.montar_corpo_html(
+                    banker_nome,
+                    assinatura,
+                    data_ref,
+                    f"cid:{cid_inv}" if img_i else None,
+                    f"cid:{cid_bank}" if img_b else None,
+                    aviso_teste=aviso,
                 ),
             )
         except Exception as exc:
-            logger.error("Falha ao enviar e-mail para banker %s: %s", grupo.banker_id, exc, exc_info=True)
-            falhas.append(grupo.banker_id)
+            logger.error("Falha ao enviar e-mail para banker %s: %s", banker_id, exc, exc_info=True)
+            falhas.append(banker_id)
 
     if falhas:
         notify.send_alert(
@@ -137,7 +175,8 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
 
     if not dry_run and settings.get("manter_historico", True):
         history_path = ROOT / settings.get("historico_path", "historico/envios_diarios.csv")
-        history_log.append_snapshot(grupos, data_ref, history_path)
+        history_log.append_snapshot(grupos_investimentos, "investimentos", data_ref, history_path)
+        history_log.append_snapshot(grupos_banking, "banking", data_ref, history_path)
 
 
 def main() -> None:
