@@ -12,7 +12,7 @@ LARGURA_IMAGEM = 640
 
 def texto_cartoes(banker_nome: str) -> list[str]:
     saudacao = f"Bom dia {primeiro_nome(banker_nome)}, tudo bem?"
-    return [saudacao, "Segue abaixo o vencimento da fatura de cartão de crédito dos seus clientes nos próximos dias."]
+    return [saudacao, "Segue abaixo o vencimento da fatura de cartão de crédito dos seus clientes."]
 
 
 def montar_corpo_html(
