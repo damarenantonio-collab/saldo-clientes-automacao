@@ -57,7 +57,7 @@ def montar_corpo_html(
       <p style="font-size:{TAMANHO_TEXTO};margin-top:4px;">Att,</p>
       <p style="font-size:{TAMANHO_TEXTO};">{assinatura}</p>
       <p style="color:#6B7A94;font-size:{TAMANHO_TEXTO};margin-top:16px;font-style:italic;">
-        E-mail gerado automaticamente. Contém informação confidencial — não encaminhe.
+        E-mail gerado automaticamente. Contém informação confidencial, não encaminhe.
       </p>
     </body>
     </html>
