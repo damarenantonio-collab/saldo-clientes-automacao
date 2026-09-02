@@ -107,6 +107,11 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
         banker_nome = (grupo_inv or grupo_bank).banker_nome
         email = (grupo_inv or grupo_bank).email
 
+        if grupo_inv:
+            grupo_inv.clientes = grupo_inv.clientes.sort_values("saldo", ascending=False).reset_index(drop=True)
+        if grupo_bank:
+            grupo_bank.clientes = grupo_bank.clientes.sort_values("saldo", ascending=False).reset_index(drop=True)
+
         qtd_inv = len(grupo_inv.clientes) if grupo_inv else 0
         qtd_bank = len(grupo_bank.clientes) if grupo_bank else 0
         if log_sensivel:
