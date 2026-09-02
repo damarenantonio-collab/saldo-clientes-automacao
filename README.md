@@ -13,18 +13,17 @@ independentes entre si:
   mantida manualmente (`lembretes_cartoes.xlsx`) — só envia e-mail
   quando há algum vencimento próximo.
 
-Os dois primeiros são multi-banker: a planilha já traz o responsável
-de cada linha (coluna "Responsável"), então o boletim manda um e-mail
-por banker, cada um só com os seus próprios clientes — hoje Eduardo
-Rego, Viviane Brandão e Antonio Carvalho. O de cartões é diferente —
-veja a seção própria dele abaixo.
+Os três são multi-banker: a planilha já traz o responsável de cada
+linha (coluna "Responsável"), então o boletim manda um e-mail por
+banker, cada um só com os seus próprios clientes — hoje Eduardo Rego,
+Viviane Brandão e Antonio Carvalho.
 
 ## Como o banker é identificado
 
-As planilhas de saldo e vencimentos seguem o mesmo princípio: uma (ou
-mais) aba(s) com uma coluna **"Responsável"** trazendo o nome do
-banker daquela linha. `src/bankers.slugify_banker()` transforma esse
-nome num `banker_id` (minúsculo, sem acento, espaço vira underscore):
+As três planilhas (saldo, vencimentos e cartões) seguem o mesmo
+princípio: uma coluna **"Responsável"** trazendo o nome do banker
+daquela linha. `src/bankers.slugify_banker()` transforma esse nome num
+`banker_id` (minúsculo, sem acento, espaço vira underscore):
 
 ```
 "Eduardo Rego"     -> eduardo_rego
@@ -136,7 +135,9 @@ por cartão de cada cliente. O script lê essa planilha todo dia e só
 manda e-mail quando há algum cliente com fatura vencendo dentro da
 janela de aviso (`cartoes_dias_aviso`, padrão 1 dia — ou seja, avisa no
 dia anterior e no próprio dia do vencimento). Nos outros dias, não
-envia nada.
+envia nada. É multi-banker: cada cartão traz o responsável (coluna
+"Responsável"), então cada banker recebe um e-mail só com os cartões
+dos seus próprios clientes.
 
 ### Formato da planilha de cartões
 
@@ -149,21 +150,12 @@ A planilha tem linhas de instrução no topo (ignoradas automaticamente
 | `Cartão / Descrição`   | banco emissor ou descrição do cartão          |
 | `Dia do Venc.`         | dia do mês (1–31) em que a fatura vence, todo mês |
 | `Ativo`                | `Sim`/`Não` — só linhas `Sim` geram aviso     |
+| `Responsável`          | nome do banker — vira o `banker_id`           |
 
 Colunas extras da sua planilha original (`Observações`, `Próximo
 Vencimento`, `Dias até Vencer`, `Status`) não são usadas — o script
 recalcula a data de vencimento e os dias restantes ele mesmo, a partir
 só do `Dia do Venc.`, em vez de depender de fórmulas do Excel.
-
-### Só um banker (por enquanto)
-
-Essa planilha não tem coluna de "Responsável" como as outras duas —
-hoje todos os clientes cadastrados nela são de um único banker,
-configurado em `cartoes_banker_id` no `settings.yaml` (precisa ser um
-`banker_id` que exista em `bankers.csv`). Se um dia precisar atender
-mais de um banker nesse boletim, essa automação vai precisar ser
-revista pra ganhar uma coluna de responsável, no mesmo padrão do
-saldo/vencimentos.
 
 ### Limitação: dias úteis
 
@@ -260,8 +252,7 @@ Vale para os dois boletins — ambos usam o mesmo `src/agrupador.py`.
    ajuste:
    - `saldos_xlsx`: caminho da planilha consolidada de saldo;
    - `vencimentos_xlsx`: caminho da planilha consolidada de vencimentos;
-   - `cartoes_xlsx` e `cartoes_banker_id`: caminho da planilha de
-     controle de cartões e o banker que deve receber os avisos;
+   - `cartoes_xlsx`: caminho da planilha de controle de cartões;
    - `email:` com os dados de SMTP da empresa — **deixe
      `modo_teste.ativo: true`** enquanto estiver testando (veja abaixo).
 

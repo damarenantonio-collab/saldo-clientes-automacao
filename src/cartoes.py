@@ -1,10 +1,10 @@
 """Leitura e validação da planilha de controle de vencimento de fatura
 de cartão de crédito, mantida manualmente (não vem do BTG).
 
-Diferente de saldos.py/vencimentos.py, essa planilha não tem uma
-coluna de "Responsável" — hoje todos os clientes cadastrados aqui
-pertencem a um único banker, configurado em `cartoes_banker_id` no
-settings.yaml (veja README, seção do boletim de cartões).
+Igual saldos.py/vencimentos.py, cada linha traz o banker responsável
+(coluna "Responsável") — o banker_id vem direto do arquivo (veja
+`src/bankers.slugify_banker`), então o boletim é multi-banker sem
+configuração extra.
 """
 
 import calendar
@@ -14,11 +14,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from .bankers import slugify_banker
+
 SHEET_PADRAO = "Clientes"
 
 ATIVO_VALORES_VALIDOS = {"sim", "s", "yes", "true", "1"}
 
-COLUNAS_ORIGEM = ["cliente", "cartao", "dia_vencimento", "ativo"]
+COLUNAS_ORIGEM = ["cliente", "cartao", "dia_vencimento", "ativo", "responsavel"]
 
 
 def _normalizar(texto: str) -> str:
@@ -59,8 +61,8 @@ def _proxima_data(dia_vencimento: int, hoje: date) -> date:
 def load_cartoes(cartoes_xlsx: Path, sheet_name: str = SHEET_PADRAO, hoje: date | None = None) -> pd.DataFrame:
     """Lê a planilha de controle de cartões e retorna um DataFrame, uma
     linha por cartão **ativo**, com as colunas `cliente`, `cartao`,
-    `dia_vencimento`, `proximo_vencimento` e `dias_ate_vencer` (0 =
-    vence hoje, 1 = vence amanhã, etc).
+    `dia_vencimento`, `proximo_vencimento`, `dias_ate_vencer` (0 =
+    vence hoje, 1 = vence amanhã, etc) e `banker_id`.
     """
     hoje = hoje or date.today()
 
@@ -80,6 +82,8 @@ def load_cartoes(cartoes_xlsx: Path, sheet_name: str = SHEET_PADRAO, hoje: date 
             renomear[coluna] = "dia_vencimento"
         elif chave == "ativo":
             renomear[coluna] = "ativo"
+        elif chave == "responsavel":
+            renomear[coluna] = "responsavel"
 
     df = bruto.rename(columns=renomear)
 
@@ -93,6 +97,7 @@ def load_cartoes(cartoes_xlsx: Path, sheet_name: str = SHEET_PADRAO, hoje: date 
     df = df[COLUNAS_ORIGEM].copy()
     df["cliente"] = df["cliente"].str.strip()
     df["cartao"] = df["cartao"].fillna("").str.strip()
+    df["responsavel"] = df["responsavel"].fillna("").str.strip()
     df = df[df["cliente"].notna() & (df["cliente"] != "")]
 
     ativo_normalizado = df["ativo"].fillna("").str.strip().str.lower()
@@ -110,4 +115,5 @@ def load_cartoes(cartoes_xlsx: Path, sheet_name: str = SHEET_PADRAO, hoje: date 
     df["proximo_vencimento"] = df["dia_vencimento"].apply(lambda d: _proxima_data(d, hoje))
     df["dias_ate_vencer"] = df["proximo_vencimento"].apply(lambda dt: (dt - hoje).days)
 
-    return df.reset_index(drop=True)
+    df["banker_id"] = df["responsavel"].map(slugify_banker)
+    return df.drop(columns=["responsavel"]).reset_index(drop=True)

@@ -55,7 +55,6 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool, hoje: date) -> No
     bankers_csv = (ROOT / settings["bankers_csv"]).resolve()
     sheet_name = settings.get("cartoes_sheet", cartoes.SHEET_PADRAO)
     dias_aviso = settings.get("cartoes_dias_aviso", 1)
-    banker_id = settings["cartoes_banker_id"]
 
     if not cartoes_xlsx.exists():
         raise RuntimeError(
@@ -80,62 +79,81 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool, hoje: date) -> No
         logger.info("Nenhum vencimento de cartão dentro da janela de %d dia(s). Nada enviado.", dias_aviso)
         return
 
-    info = mapa_bankers.get(banker_id)
-    if not info or not info.get("email"):
-        notify.send_alert(
-            settings,
-            subject=f"[Cartões] banker '{banker_id}' sem e-mail cadastrado",
-            body=(
-                f"O banker_id configurado em cartoes_banker_id ('{banker_id}') não está em "
-                f"bankers.csv ou não tem e-mail cadastrado — os avisos de cartão de "
-                f"{len(df_aviso)} cliente(s) NÃO foram enviados nesta execução."
-            ),
-        )
-        return
-
-    grupo = GrupoBanker(banker_id=banker_id, banker_nome=info["nome"], email=info["email"], clientes=df_aviso)
-
-    if log_sensivel:
-        logger.info("Banker %s (%s): %d aviso(s) de cartão.", grupo.banker_nome, grupo.email, len(df_aviso))
-    else:
-        logger.info("Banker %s: %d aviso(s) de cartão.", grupo.banker_nome, len(df_aviso))
-
     assinatura = settings["assinatura"]
     assunto_template = settings.get("assunto_template_cartoes", "Vencimento de Fatura de Cartão - {data}")
     subject = assunto_template.format(data=hoje.strftime("%d/%m/%Y"))
-
-    imagem_png = tabela_cartoes_imagem.gerar_png(grupo)
-    cid = f"cartoes-{grupo.banker_id}"
-
     saida_teste = ROOT / "saida_teste"
+    falhas = []
+    pendentes = []
 
-    if dry_run:
-        data_uri = "data:image/png;base64," + base64.b64encode(imagem_png).decode("ascii")
-        html_body = email_builder_cartoes.montar_corpo_html(grupo, assinatura, data_uri)
-        saida_teste.mkdir(parents=True, exist_ok=True)
-        destino = saida_teste / f"cartoes-{grupo.banker_id}.html"
-        destino.write_text(html_body, encoding="utf-8")
-        logger.info("[DRY-RUN] E-mail de cartões de %s gravado em %s (nada foi enviado).", grupo.banker_nome, destino)
-        return
+    # Um e-mail por banker, só com os cartões dele. O groupby por
+    # banker_id já garante que cada grupo tem um único banker (sem
+    # risco de misturar clientes de bankers diferentes num mesmo
+    # e-mail).
+    for banker_id, clientes in df_aviso.groupby("banker_id", sort=True):
+        info = mapa_bankers.get(banker_id)
+        if not info or not info.get("email"):
+            pendentes.append(banker_id)
+            continue
 
-    try:
-        notify.enviar_email_banker(
-            settings["email"],
-            grupo,
-            subject,
-            [(imagem_png, cid)],
-            lambda aviso, g=grupo, c=cid: email_builder_cartoes.montar_corpo_html(
-                g, assinatura, f"cid:{c}", aviso_teste=aviso
-            ),
+        grupo = GrupoBanker(
+            banker_id=banker_id,
+            banker_nome=info["nome"],
+            email=info["email"],
+            clientes=clientes.reset_index(drop=True),
         )
-    except Exception as exc:
-        logger.error("Falha ao enviar e-mail de cartões para banker %s: %s", grupo.banker_id, exc, exc_info=True)
+
+        if log_sensivel:
+            logger.info("Banker %s (%s): %d aviso(s) de cartão.", grupo.banker_nome, grupo.email, len(grupo.clientes))
+        else:
+            logger.info("Banker %s: %d aviso(s) de cartão.", grupo.banker_nome, len(grupo.clientes))
+
+        imagem_png = tabela_cartoes_imagem.gerar_png(grupo)
+        cid = f"cartoes-{grupo.banker_id}"
+
+        if dry_run:
+            data_uri = "data:image/png;base64," + base64.b64encode(imagem_png).decode("ascii")
+            html_body = email_builder_cartoes.montar_corpo_html(grupo, assinatura, data_uri)
+            saida_teste.mkdir(parents=True, exist_ok=True)
+            destino = saida_teste / f"cartoes-{grupo.banker_id}.html"
+            destino.write_text(html_body, encoding="utf-8")
+            logger.info(
+                "[DRY-RUN] E-mail de cartões de %s gravado em %s (nada foi enviado).", grupo.banker_nome, destino
+            )
+            continue
+
+        try:
+            notify.enviar_email_banker(
+                settings["email"],
+                grupo,
+                subject,
+                [(imagem_png, cid)],
+                lambda aviso, g=grupo, c=cid: email_builder_cartoes.montar_corpo_html(
+                    g, assinatura, f"cid:{c}", aviso_teste=aviso
+                ),
+            )
+        except Exception as exc:
+            logger.error("Falha ao enviar e-mail de cartões para banker %s: %s", grupo.banker_id, exc, exc_info=True)
+            falhas.append(grupo.banker_id)
+
+    if pendentes:
         notify.send_alert(
             settings,
-            subject="[Cartões] Falha ao enviar e-mail",
+            subject=f"[Cartões] {len(pendentes)} responsável(is) sem e-mail cadastrado",
             body=(
-                f"Falha ao enviar o e-mail de aviso de cartões para o banker {grupo.banker_id}. "
-                f"Veja logs/execucao_cartoes.log para detalhes:\n\n{exc}"
+                f"Os banker_id(s) abaixo aparecem na planilha de cartões (responsável) com "
+                f"vencimento próximo mas não têm e-mail cadastrado em bankers.csv — os avisos "
+                f"deles NÃO foram enviados nesta execução:\n\n" + "\n".join(f"- {b}" for b in pendentes)
+            ),
+        )
+
+    if falhas:
+        notify.send_alert(
+            settings,
+            subject=f"[Cartões] Falha ao enviar e-mail para {len(falhas)} banker(s)",
+            body=(
+                f"Falha ao enviar o e-mail de aviso de cartões para os banker_id(s) abaixo. "
+                f"Veja logs/execucao_cartoes.log para detalhes:\n\n" + "\n".join(f"- {b}" for b in falhas)
             ),
         )
 
