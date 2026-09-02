@@ -10,6 +10,7 @@ from PIL import ImageFont
 NAVY = (11, 31, 59)  # #0B1F3B
 NAVY_CLARO = (217, 223, 234)  # #D9DFEA
 BRANCO = (255, 255, 255)
+VERMELHO = (198, 40, 40)  # #C62828 — alerta de saldo negativo
 
 # Georgia é a mesma fonte usada no texto do e-mail e vem com o Windows/
 # Office por padrão. Se não existir (ex: rodando fora do Windows), cai

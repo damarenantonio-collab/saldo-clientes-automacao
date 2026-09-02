@@ -17,6 +17,12 @@ saldos_xlsx: "C:/Saldo/Saldo_em_CC_BTG.xlsx"
 saldos_sheet_investimentos: "Investimentos"
 saldos_sheet_banking: "Banking"
 
+# Só entram no e-mail contas com saldo POSITIVO a partir desse valor,
+# OU saldo NEGATIVO (esses sempre entram, e aparecem em vermelho pra
+# alertar). Saldos positivos abaixo desse valor (ex: R$ 0,00 a
+# R$ 499,99 com o padrão 500) são descartados. Vale pras duas abas.
+saldo_minimo: 500
+
 # Caminho do arquivo com o mapeamento banker -> e-mail. Veja
 # config/bankers.example.csv pro formato.
 bankers_csv: "config/bankers.csv"

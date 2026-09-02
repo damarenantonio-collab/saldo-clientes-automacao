@@ -41,6 +41,13 @@ def load_settings(config_path: Path) -> dict:
         return yaml.safe_load(f)
 
 
+def _filtrar_saldo(df, saldo_minimo: float):
+    """Mantém só as contas relevantes pro banker: saldo negativo
+    (sempre, pra alertar) ou saldo positivo >= saldo_minimo. Descarta
+    o intervalo de R$0,00 a (saldo_minimo - 0,01)."""
+    return df[(df["saldo"] < 0) | (df["saldo"] >= saldo_minimo)].reset_index(drop=True)
+
+
 def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
     saldos_xlsx = (ROOT / settings["saldos_xlsx"]).resolve()
     bankers_csv = (ROOT / settings["bankers_csv"]).resolve()
@@ -63,12 +70,24 @@ def run(settings: dict, logger: logging.Logger, dry_run: bool) -> None:
     mapa_bankers = bankers.load_bankers(bankers_csv)
     log_sensivel = settings.get("log_dados_sensiveis", False)
 
+    # Só envia conta com saldo positivo >= saldo_minimo, OU saldo
+    # negativo (esses sempre entram, pra alertar). Descarta o intervalo
+    # de R$0,00 a (saldo_minimo - 0,01), que não interessa ao banker.
+    saldo_minimo = settings.get("saldo_minimo", 500)
+    total_inv, total_bank = len(df_investimentos), len(df_banking)
+    df_investimentos = _filtrar_saldo(df_investimentos, saldo_minimo)
+    df_banking = _filtrar_saldo(df_banking, saldo_minimo)
+
     logger.info(
-        "Carregado(s) %d conta(s) de cliente da aba '%s' e %d da aba '%s'.",
-        len(df_investimentos),
+        "Carregado(s) %d conta(s) da aba '%s' (%d após filtro >= R$ %.2f ou negativo) "
+        "e %d da aba '%s' (%d após filtro).",
+        total_inv,
         sheet_investimentos,
-        len(df_banking),
+        len(df_investimentos),
+        saldo_minimo,
+        total_bank,
         sheet_banking,
+        len(df_banking),
     )
 
     grupos_investimentos, pendentes_investimentos = agrupador.agrupar_por_banker(df_investimentos, mapa_bankers)

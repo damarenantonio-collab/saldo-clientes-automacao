@@ -67,9 +67,25 @@ que comece com "Saldo"):
 
 Um mesmo cliente pode aparecer em mais de uma linha na mesma aba, se
 tiver mais de uma conta — cada linha vira uma linha na tabela do
-e-mail. Se um banker não tiver nenhum cliente numa das duas abas, a
-tabela correspondente simplesmente não aparece no e-mail dele (sem
-aviso de "vazio").
+e-mail. Se um banker não tiver nenhum cliente numa das duas abas (após
+o filtro abaixo), a tabela correspondente simplesmente não aparece no
+e-mail dele (sem aviso de "vazio").
+
+### Filtro de saldo e alerta de negativo
+
+Nem toda conta entra no e-mail. A regra (vale pras duas abas):
+
+- **Saldo positivo abaixo de `saldo_minimo`** (padrão R$ 500) — **não
+  entra**. Ex: uma conta com R$ 0,00 a R$ 499,99 é descartada, pra não
+  poluir o e-mail com saldo irrelevante.
+- **Saldo positivo >= `saldo_minimo`** — entra normalmente.
+- **Saldo negativo** — **sempre entra**, qualquer valor, e aparece em
+  **vermelho e negrito** na tabela, pra alertar o banker.
+
+As linhas vêm ordenadas do maior saldo pro menor (negativos, por serem
+os menores, ficam no fim). O valor de `saldo_minimo` é configurável em
+`settings.yaml` — troque pra outro número se quiser um corte diferente,
+ou `0` pra não filtrar positivos.
 
 ## Boletim de vencimentos (vencimentos_mensal.py)
 

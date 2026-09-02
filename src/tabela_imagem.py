@@ -11,7 +11,17 @@ from io import BytesIO
 from PIL import Image, ImageDraw
 
 from .agrupador import GrupoBanker
-from .imagem_util import BRANCO, FONTES_BOLD, FONTES_REGULAR, NAVY, NAVY_CLARO, carregar_fonte, escrever, fmt_moeda
+from .imagem_util import (
+    BRANCO,
+    FONTES_BOLD,
+    FONTES_REGULAR,
+    NAVY,
+    NAVY_CLARO,
+    VERMELHO,
+    carregar_fonte,
+    escrever,
+    fmt_moeda,
+)
 
 LARGURA = 640
 ALTURA_LINHA = 38
@@ -40,9 +50,10 @@ def gerar_png(grupo: GrupoBanker, tamanho_fonte: int = 14) -> bytes:
     y = ALTURA_FAIXA
     for _, row in grupo.clientes.iterrows():
         y0, y1 = y, y + ALTURA_LINHA
+        cor_saldo = VERMELHO if row["saldo"] < 0 else NAVY
         escrever(draw, PADDING_X, y0, y1, str(row["cliente"]), fonte, NAVY)
         escrever(draw, COL_CLIENTE + PADDING_X, y0, y1, str(row["conta"]), fonte, NAVY)
-        escrever(draw, 0, y0, y1, fmt_moeda(row["saldo"]), fonte, NAVY, alinhar_direita_em=margem_direita)
+        escrever(draw, 0, y0, y1, fmt_moeda(row["saldo"]), fonte_bold if row["saldo"] < 0 else fonte, cor_saldo, alinhar_direita_em=margem_direita)
         draw.line([(0, y1 - 1), (LARGURA, y1 - 1)], fill=NAVY_CLARO, width=1)
         y = y1
 
